@@ -12,6 +12,12 @@ pnpm-lock.yaml
 package-lock.json
 yarn.lock
 
+# Per-machine engine state (written by `iii worker add` + engine runtime)
+config.yaml
+iii.lock
+data/
+skills/
+
 # TypeScript build cache
 *.tsbuildinfo
 

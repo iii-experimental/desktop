@@ -9,6 +9,7 @@
 
 import {
   registerWorker,
+  TriggerAction,
   type ISdk,
   type RemoteFunctionHandler,
 } from "iii-browser-sdk";
@@ -21,19 +22,15 @@ export interface IiiClient {
   call<T = unknown>(
     functionId: string,
     payload?: Record<string, unknown>,
+    opts?: { timeoutMs?: number },
   ): Promise<T>;
+  fire(functionId: string, payload?: Record<string, unknown>): Promise<void>;
   on<P = unknown>(
     functionId: string,
     handler: (payload: P) => void | Promise<void>,
   ): () => void;
   subscribeState(listener: (state: ConnectionState) => void): () => void;
   dispose(): Promise<void>;
-}
-
-interface BridgeInfo {
-  ws_path: string;
-  protocol: "ws" | "wss";
-  engine_url: string;
 }
 
 let _clientPromise: Promise<IiiClient> | null = null;
@@ -64,37 +61,10 @@ async function resolveWsUrl(): Promise<string> {
     ?.trim();
   if (envUrl) return envUrl;
 
-  try {
-    const info = await fetchBridgeInfo();
-    const proto = info.protocol === "wss" ? "wss" : "ws";
-    return `${proto}://${window.location.host}${info.ws_path}`;
-  } catch {
-    // Fallback: connect directly to the browser RBAC port. Works when the
-    // engine runs on the same machine (the typical desktop case).
-    return "ws://127.0.0.1:49135";
-  }
-}
-
-async function fetchBridgeInfo(): Promise<BridgeInfo> {
-  const res = await fetch("/harness/call", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ function_id: "harness::info", payload: {} }),
-  });
-  if (!res.ok) throw new Error(`harness::info ${res.status}`);
-  const data = (await res.json()) as Partial<BridgeInfo>;
-  if (
-    typeof data.ws_path !== "string" ||
-    (data.protocol !== "ws" && data.protocol !== "wss") ||
-    typeof data.engine_url !== "string"
-  ) {
-    throw new Error("harness::info malformed");
-  }
-  return {
-    ws_path: data.ws_path,
-    protocol: data.protocol,
-    engine_url: data.engine_url,
-  };
+  // Default to the backend port. Newer harness exposes the same WS endpoint
+  // for both backend and browser workers; the engine RBAC layer scopes
+  // capabilities by registered function prefix.
+  return "ws://127.0.0.1:49134";
 }
 
 function wrap(sdk: ISdk, browserId: string): IiiClient {
@@ -111,14 +81,33 @@ function wrap(sdk: ISdk, browserId: string): IiiClient {
   async function call<T>(
     functionId: string,
     payload: Record<string, unknown> = {},
+    opts: { timeoutMs?: number } = {},
   ): Promise<T> {
     try {
       const result = await sdk.trigger<unknown, T>({
         function_id: functionId,
         payload,
+        ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
       });
       setState("open");
       return result;
+    } catch (err) {
+      setState("error");
+      throw err;
+    }
+  }
+
+  async function fire(
+    functionId: string,
+    payload: Record<string, unknown> = {},
+  ): Promise<void> {
+    try {
+      await sdk.trigger({
+        function_id: functionId,
+        payload,
+        action: TriggerAction.Void(),
+      });
+      setState("open");
     } catch (err) {
       setState("error");
       throw err;
@@ -131,6 +120,7 @@ function wrap(sdk: ISdk, browserId: string): IiiClient {
       return state;
     },
     call,
+    fire,
     on(functionId, handler) {
       const id = `${functionId}::${browserId}`;
       const wrapped: RemoteFunctionHandler = async (data) => {

@@ -1,57 +1,190 @@
-/*
- * Subscribe to `agent::events` for the active session via the iii browser
- * worker. Frames arrive at `ui::session::event::<browser_id>`; we filter
- * by session_id and dispatch into a reducer.
- *
- * This is intentionally a thin port of workers/harness/web's hook. When
- * the harness UI extracts a shared package, swap this for the import.
- */
-
 import { useEffect, useReducer } from "react";
 import { getIiiClient } from "./iii-client";
-import type { AgentEvent, Message } from "./types";
+import type { FunctionCall, Message, MessagePart } from "./types";
 
 export interface StreamState {
   messages: Message[];
   pending: Message | null;
+  active: boolean;
 }
 
-const INITIAL: StreamState = { messages: [], pending: null };
+const INITIAL: StreamState = { messages: [], pending: null, active: false };
 
-type Action =
-  | { kind: "event"; event: AgentEvent }
-  | { kind: "reset" };
+interface AgentEvent {
+  type: string;
+  message?: AgentMessage;
+  delta?: string;
+  usage?: Message["usage"];
+  function_call_id?: string;
+  function_id?: string;
+  args?: Record<string, unknown>;
+  result?: unknown;
+  is_error?: boolean;
+  [k: string]: unknown;
+}
+
+interface AgentMessage {
+  role?: string;
+  content?: string | Array<{ type?: string; text?: string }>;
+  timestamp?: number;
+  stop_reason?: string;
+  provider?: string;
+  model?: string;
+  usage?: Message["usage"];
+}
+
+function blocksToText(content: AgentMessage["content"] | undefined): string {
+  if (!content) return "";
+  if (typeof content === "string") return content;
+  return content
+    .filter((b) => b.type === "text" || !b.type)
+    .map((b) => b.text ?? "")
+    .join("");
+}
+
+function isAssistant(m?: AgentMessage): boolean {
+  return m?.role === "assistant";
+}
+
+function freshPending(ts = Date.now()): Message {
+  return {
+    id: `m-${ts}-${Math.random().toString(36).slice(2, 6)}`,
+    role: "assistant",
+    content: "",
+    timestamp: ts,
+    function_calls: [],
+    parts: [],
+  };
+}
+
+function appendTextPart(parts: MessagePart[], text: string): MessagePart[] {
+  if (!text) return parts;
+  const last = parts[parts.length - 1];
+  if (last && last.kind === "text") {
+    if (last.text === text) return parts;
+    return [...parts.slice(0, -1), { kind: "text", text }];
+  }
+  return [...parts, { kind: "text", text }];
+}
+
+function upsertCallPart(
+  parts: MessagePart[],
+  call: FunctionCall,
+): MessagePart[] {
+  const idx = parts.findIndex(
+    (p) => p.kind === "tool" && p.call.id === call.id,
+  );
+  if (idx === -1) return [...parts, { kind: "tool", call }];
+  const next = [...parts];
+  next[idx] = { kind: "tool", call };
+  return next;
+}
+
+type Action = { kind: "event"; event: AgentEvent } | { kind: "reset" };
 
 function reduce(state: StreamState, action: Action): StreamState {
   if (action.kind === "reset") return INITIAL;
   const ev = action.event;
+
   switch (ev.type) {
+    case "agent_start":
+      return {
+        ...state,
+        active: true,
+        pending: state.pending ?? freshPending(),
+      };
+
     case "turn_start":
       return {
         ...state,
+        active: true,
+        pending: state.pending ?? freshPending(),
+      };
+
+    case "message_start":
+    case "message_end": {
+      if (!isAssistant(ev.message)) return state;
+      const m = ev.message;
+      const text = blocksToText(m?.content);
+      const ts = m?.timestamp ?? Date.now();
+      const usage = ev.usage ?? m?.usage;
+      const pending = state.pending ?? freshPending(ts);
+      const parts = appendTextPart(pending.parts ?? [], text);
+      return {
+        ...state,
         pending: {
-          id: String(ev.id ?? Date.now()),
-          role: "assistant",
-          content: "",
-          timestamp: Date.now(),
+          ...pending,
+          content: text || pending.content,
+          parts,
+          usage: usage ?? pending.usage,
+          stop_reason: m?.stop_reason ?? pending.stop_reason,
+          provider: m?.provider ?? pending.provider,
+          model: m?.model ?? pending.model,
         },
       };
-    case "message_delta": {
-      const delta = String((ev as { delta?: unknown }).delta ?? "");
-      const pending = state.pending ?? {
-        id: `m-${Date.now()}`,
-        role: "assistant",
-        content: "",
-        timestamp: Date.now(),
+    }
+
+    case "function_execution_start": {
+      const id = String(ev.function_call_id ?? `fc-${Date.now()}`);
+      const call: FunctionCall = {
+        id,
+        function_id: String(ev.function_id ?? "unknown"),
+        payload: (ev.args as Record<string, unknown>) ?? {},
+        status: "running",
       };
-      return { ...state, pending: { ...pending, content: pending.content + delta } };
+      const pending = state.pending ?? freshPending();
+      return {
+        ...state,
+        pending: {
+          ...pending,
+          function_calls: [...(pending.function_calls ?? []), call],
+          parts: upsertCallPart(pending.parts ?? [], call),
+        },
+      };
     }
-    case "message_end": {
-      if (!state.pending) return state;
-      const usage = (ev as { usage?: Message["usage"] }).usage;
-      const final: Message = { ...state.pending, usage };
-      return { messages: [...state.messages, final], pending: null };
+
+    case "function_execution_end": {
+      const id = String(ev.function_call_id ?? "");
+      const pending = state.pending;
+      if (!pending) return state;
+      const existing = (pending.function_calls ?? []).find((c) => c.id === id);
+      if (!existing) return state;
+      const updated: FunctionCall = {
+        ...existing,
+        status: ev.is_error ? "error" : "done",
+        result: ev.result,
+        error: ev.is_error
+          ? typeof ev.result === "string"
+            ? ev.result
+            : JSON.stringify(ev.result)
+          : undefined,
+      };
+      return {
+        ...state,
+        pending: {
+          ...pending,
+          function_calls: (pending.function_calls ?? []).map((c) =>
+            c.id === id ? updated : c,
+          ),
+          parts: upsertCallPart(pending.parts ?? [], updated),
+        },
+      };
     }
+
+    case "agent_end": {
+      if (!state.pending) return { ...state, active: false };
+      return {
+        messages: [...state.messages, state.pending],
+        pending: null,
+        active: false,
+      };
+    }
+
+    case "turn_end":
+      // Keep pending alive; agent may emit more turns within the same agent
+      // (text -> tool -> text). Only commit on agent_end.
+      return state;
+
     default:
       return state;
   }
@@ -87,10 +220,23 @@ export function useAgentStream(sessionId: string | null): StreamState {
         const client = await getIiiClient();
         if (cancelled) return;
         browserId = client.browserId;
-        off = client.on<Envelope>("ui::session::event", (payload) => {
-          const ev = extract(payload, sessionId);
-          if (ev) dispatch({ kind: "event", event: ev });
-        });
+        const registered = client.on<Envelope>(
+          "ui::session::event",
+          (payload) => {
+            if (cancelled) return;
+            const ev = extract(payload, sessionId);
+            if (!ev) return;
+            dispatch({ kind: "event", event: ev });
+            if (typeof window !== "undefined") {
+              console.debug("[stream]", ev.type, ev);
+            }
+          },
+        );
+        if (cancelled) {
+          registered();
+          return;
+        }
+        off = registered;
         await client.call("ui::subscribe", {
           browser_id: browserId,
           session_id: sessionId,
@@ -105,10 +251,12 @@ export function useAgentStream(sessionId: string | null): StreamState {
       off?.();
       if (browserId) {
         void getIiiClient().then((c) =>
-          c.call("ui::unsubscribe", {
-            browser_id: browserId,
-            session_id: sessionId,
-          }).catch(() => {}),
+          c
+            .call("ui::unsubscribe", {
+              browser_id: browserId,
+              session_id: sessionId,
+            })
+            .catch(() => {}),
         );
       }
     };

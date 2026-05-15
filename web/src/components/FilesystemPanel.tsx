@@ -21,7 +21,7 @@ export function FilesystemPanel({ cwd }: Props) {
     try {
       const client = await getIiiClient();
       const result = await client.call<{ entries?: FsEntry[] }>(
-        "harness::call",
+        "bridge::trigger",
         {
           function_id: "shell::fs::ls",
           payload: { path: target },

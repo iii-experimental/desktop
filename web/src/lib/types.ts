@@ -1,10 +1,29 @@
 export type Role = "user" | "assistant" | "system" | "tool";
 
+export interface FunctionCall {
+  id: string;
+  function_id: string;
+  payload: Record<string, unknown>;
+  status: "pending" | "running" | "done" | "error";
+  result?: unknown;
+  error?: string;
+}
+
+export type MessagePart =
+  | { kind: "text"; text: string }
+  | { kind: "tool"; call: FunctionCall };
+
 export interface Message {
   id: string;
   role: Role;
   content: string;
   timestamp: number;
+  reasoning?: string;
+  function_calls?: FunctionCall[];
+  parts?: MessagePart[];
+  stop_reason?: string;
+  provider?: string;
+  model?: string;
   usage?: {
     input?: number;
     output?: number;
@@ -19,7 +38,7 @@ export interface SessionRow {
   updated_at: number;
 }
 
-export type Tab = "chat" | "cost" | "files" | "status";
+export type Tab = "chat" | "cost" | "files" | "activity" | "status";
 
 export interface ApprovalRequest {
   id: string;

@@ -8,15 +8,15 @@ pub struct WorkerHandle {
 }
 
 /// Spawn the iii-sdk worker that registers `desktop::*` functions on the
-/// backend engine (port 49134 by default). The web UI keeps its own
-/// browser-side connection on port 49135 via `iii-browser-sdk`; this
-/// worker is what exposes native capabilities (file dialogs, deep links,
-/// window focus) to the rest of the iii ecosystem.
+/// backend engine (port 49134 by default). Tauri 2 owns the tokio runtime
+/// at this point in the lifecycle, so spawn through `tauri::async_runtime`
+/// rather than `tokio::spawn` (which panics before the main runtime
+/// attaches).
 pub fn spawn(app: AppHandle) -> WorkerHandle {
     let (tx, mut rx) = mpsc::channel::<()>(1);
     let engine_url = env::var("III_URL").unwrap_or_else(|_| "ws://127.0.0.1:49134".into());
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         if let Err(err) = register_loop(app, engine_url, &mut rx).await {
             tracing::warn!(%err, "iii worker register loop ended");
         }

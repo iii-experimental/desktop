@@ -27,7 +27,7 @@ export function StatusPanel() {
       const [hs, wl] = await Promise.all([
         client.call<HarnessStatus>("harness::status"),
         client
-          .call<{ workers?: WorkerInfo[] }>("harness::call", {
+          .call<{ workers?: WorkerInfo[] }>("bridge::trigger", {
             function_id: "engine::workers::list",
             payload: {},
           })

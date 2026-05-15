@@ -1,31 +1,34 @@
 /*
- * iii console design tokens, vendored.
- * Source of truth: iii-hq/iii / console/packages/console-frontend.
- * Adopt verbatim — do not introduce app-specific tokens here.
+ * iii brand tokens — matches workers.iii.dev (2026-05).
+ * Blue accent, mono-first, dark default with light override.
+ * Vendor verbatim; do not introduce app-specific overrides here.
  */
 
-:root {
-  --background: #000000;
-  --foreground: #f4f4f4;
-  --sidebar: #0a0a0a;
-  --elevated: #111111;
-  --hover: #1a1a1a;
-  --border: #2d2d2d;
-  --border-subtle: #1d1d1d;
-  --muted: #5b5b5b;
-  --secondary: #9ca3af;
+:root,
+[data-theme="dark"] {
+  --background: #0b0e14;
+  --foreground: #e6edf3;
+  --sidebar: #060810;
+  --elevated: #0f131c;
+  --hover: #161b25;
+  --border: #21262d;
+  --border-subtle: #161b22;
+  --muted: #6b7280;
+  --secondary: #9aa4b2;
 
-  --accent: #f3f724;
-  --accent-text: #000000;
+  --accent: #58a6ff;
+  --accent-strong: #1f6feb;
+  --accent-text: #ffffff;
+  --prompt: #58a6ff;
 
-  --success: #22c55e;
-  --warning: #f3f724;
-  --error: #ef4444;
-  --info: #3b82f6;
+  --success: #3fb950;
+  --warning: #d29922;
+  --error: #f85149;
+  --info: #58a6ff;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
   --radius-full: 9999px;
 
   --space-1: 4px;
@@ -36,9 +39,31 @@
   --space-8: 32px;
 
   --font-sans:
-    "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    "JetBrains Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --font-mono:
-    "JetBrains Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    "JetBrains Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #1f2328;
+  --sidebar: #f6f8fa;
+  --elevated: #ffffff;
+  --hover: #eaeef2;
+  --border: #d0d7de;
+  --border-subtle: #e6ebf0;
+  --muted: #6e7781;
+  --secondary: #57606a;
+
+  --accent: #0969da;
+  --accent-strong: #0a5cad;
+  --accent-text: #ffffff;
+  --prompt: #0969da;
+
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --error: #cf222e;
+  --info: #0969da;
 }
 
 * {
@@ -53,11 +78,12 @@ body,
   height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.45;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-variant-ligatures: none;
 }
 
 .mono {
@@ -71,94 +97,89 @@ body,
 
 .uppercase-label {
   text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  font-size: 10px;
+  letter-spacing: 0.08em;
   color: var(--secondary);
+  font-family: var(--font-mono);
+}
+
+.prompt::before {
+  content: "$";
+  color: var(--prompt);
+  margin-right: 8px;
+  font-family: var(--font-mono);
 }
 
 .card {
   background: var(--elevated);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
 }
 
 .hr {
   border: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .vr {
   width: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
 }
 
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-full);
-  font-size: 11px;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 10px;
   font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border-subtle);
 }
 
 .pill.neutral {
-  background: var(--hover);
   color: var(--secondary);
 }
 
 .pill.outline {
-  border: 1px solid var(--border);
   color: var(--secondary);
 }
 
 .pill.ok {
-  background: rgba(34, 197, 94, 0.15);
   color: var(--success);
+  border-color: color-mix(in oklab, var(--success) 35%, var(--border-subtle));
 }
 
 .pill.warn {
-  background: rgba(243, 247, 36, 0.15);
   color: var(--warning);
+  border-color: color-mix(in oklab, var(--warning) 35%, var(--border-subtle));
 }
 
 .pill.err {
-  background: rgba(239, 68, 68, 0.15);
   color: var(--error);
+  border-color: color-mix(in oklab, var(--error) 35%, var(--border-subtle));
 }
 
-.pill.info {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--info);
-}
-
+.pill.info,
 .pill.accent {
-  background: var(--accent);
-  color: var(--accent-text);
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 35%, var(--border-subtle));
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--muted);
 }
-
-.status-dot.ok {
-  background: var(--success);
-}
-.status-dot.warn {
-  background: var(--warning);
-}
-.status-dot.err {
-  background: var(--error);
-}
-.status-dot.idle {
-  background: var(--muted);
-}
+.status-dot.ok { background: var(--success); }
+.status-dot.warn { background: var(--warning); }
+.status-dot.err { background: var(--error); }
+.status-dot.idle { background: var(--muted); }
 
 .bar-track {
-  height: 4px;
+  height: 3px;
   background: var(--hover);
   border-radius: var(--radius-full);
   overflow: hidden;
@@ -170,15 +191,6 @@ body,
   border-radius: inherit;
 }
 
-.caret {
-  display: inline-block;
-  width: 8px;
-  height: 14px;
-  background: var(--foreground);
-  vertical-align: middle;
-  animation: caret-blink 1s steps(2) infinite;
-}
-
 .thinking-dot {
   display: inline-block;
   width: 4px;
@@ -188,46 +200,13 @@ body,
   animation: thinking-pulse 1.2s ease-in-out infinite;
 }
 
-@keyframes blink {
-  to {
-    opacity: 0;
-  }
+@keyframes thinking-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
 }
 
 @keyframes caret-blink {
-  50% {
-    opacity: 0;
-  }
-}
-
-@keyframes thinking-pulse {
-  0%,
-  100% {
-    opacity: 0.25;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes slide-in-right {
-  from {
-    transform: translateX(8px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes flash-in {
-  from {
-    background: var(--accent);
-  }
-  to {
-    background: transparent;
-  }
+  50% { opacity: 0; }
 }
 
 button,
@@ -239,14 +218,14 @@ select {
   color: inherit;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
   outline: none;
 }
 
 button {
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.12s, border-color 0.12s;
 }
 
 button:hover {
@@ -260,7 +239,7 @@ textarea:focus-visible {
 }
 
 a {
-  color: var(--info);
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -271,4 +250,23 @@ a:hover {
 ::selection {
   background: var(--accent);
   color: var(--accent-text);
+}
+
+.cmd-box {
+  background: var(--background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cmd-box::before {
+  content: "$";
+  color: var(--prompt);
+  flex-shrink: 0;
 }

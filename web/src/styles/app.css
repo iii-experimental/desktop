@@ -1,11 +1,6 @@
-/*
- * App-specific layout on top of console tokens.
- * Keep this file thin; promote primitives upstream to console.css when reused.
- */
-
 .shell {
   display: grid;
-  grid-template-columns: 224px 1fr;
+  grid-template-columns: 220px 1fr;
   height: 100vh;
   overflow: hidden;
 }
@@ -15,42 +10,73 @@
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  padding: var(--space-4) var(--space-3);
-  gap: var(--space-4);
+  padding: 14px 10px 12px;
+  gap: 14px;
   user-select: none;
+  overflow: hidden;
+  padding-top: 36px;
 }
 
 .sidebar .logo {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-2);
-  font-weight: 600;
+  gap: 8px;
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--foreground);
+}
+
+.sidebar .logo .mark {
+  color: var(--foreground);
+}
+
+.sidebar .logo .sep {
+  color: var(--muted);
+}
+
+.sidebar .logo .sub {
+  color: var(--foreground);
 }
 
 .sidebar nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .sidebar nav button {
   text-align: left;
   border: 0;
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
+  border-radius: 3px;
+  padding: 4px 10px;
   color: var(--secondary);
+  background: transparent;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+}
+
+.sidebar nav button:hover {
+  background: var(--hover);
 }
 
 .sidebar nav button[data-active="true"] {
   background: var(--hover);
   color: var(--foreground);
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
 }
 
 .main {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--background);
 }
 
 .titlebar {
@@ -58,14 +84,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-4);
+  padding: 0 12px;
   border-bottom: 1px solid var(--border-subtle);
   -webkit-app-region: drag;
   user-select: none;
+  background: var(--background);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
-.titlebar button,
-.titlebar .pill {
+.titlebar > * {
   -webkit-app-region: no-drag;
 }
 
@@ -77,65 +105,145 @@
 }
 
 .transcript {
-  overflow-y: auto;
-  padding: var(--space-6) var(--space-8);
-}
-
-.composer {
-  border-top: 1px solid var(--border-subtle);
-  padding: var(--space-3) var(--space-4);
-  display: flex;
-  gap: var(--space-3);
-  align-items: end;
-  background: var(--elevated);
-}
-
-.composer textarea {
-  flex: 1;
-  resize: none;
-  min-height: 40px;
-  max-height: 200px;
-  background: transparent;
-  border: 0;
-  outline: none;
-  font-family: var(--font-sans);
-}
-
-.composer button {
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-4);
-  background: var(--accent);
-  color: var(--accent-text);
-  border: 0;
-  font-weight: 500;
-}
-
-.composer button:disabled {
-  background: var(--hover);
-  color: var(--muted);
-  cursor: not-allowed;
+  font-size: 13px;
+  font-family: var(--font-mono);
 }
 
 .transcript .turn {
-  margin-bottom: var(--space-6);
+  margin-bottom: 22px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
 }
 
-.transcript .role {
-  font-size: 11px;
-  letter-spacing: 0.08em;
+.transcript .turn.user .bubble {
+  background: var(--elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 8px 12px;
+  max-width: min(640px, 92%);
+  margin-left: auto;
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: var(--font-mono);
+}
+
+.transcript .turn.assistant .body {
+  border-left: 2px solid var(--accent);
+  padding: 0 0 0 14px;
+  font-family: var(--font-mono);
+}
+
+.transcript .turn p:first-child { margin-top: 0; }
+.transcript .turn p:last-child { margin-bottom: 0; }
+.transcript .turn p { margin: 6px 0; line-height: 1.65; }
+
+.transcript ul, .transcript ol { padding-left: 22px; margin: 6px 0; }
+.transcript li { margin: 2px 0; }
+
+.transcript blockquote {
+  border-left: 2px solid var(--border-subtle);
+  margin: 6px 0;
+  padding-left: 12px;
+  color: var(--secondary);
+}
+
+.transcript hr {
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  margin: 14px 0;
+}
+
+.transcript h1, .transcript h2, .transcript h3 {
+  font-weight: 600;
+  margin: 12px 0 6px;
+  font-family: var(--font-mono);
+}
+.transcript h1 { font-size: 15px; }
+.transcript h2 { font-size: 14px; }
+.transcript h3 { font-size: 13px; }
+
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  padding: 0px 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--secondary);
+  background: var(--elevated);
+}
+
+.palette-group [cmdk-group-heading] {
+  padding: 8px 12px 4px;
+  color: var(--muted);
+  font-size: 10px;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+}
+
+[cmdk-item][data-selected="true"] {
+  background: var(--hover);
+}
+
+.suggest-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-width: 580px;
+  margin: 24px auto 0;
+}
+
+.suggest-grid button {
+  text-align: left;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 10px 12px;
+  background: var(--elevated);
+  color: var(--foreground);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.suggest-grid button:hover {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+
+.suggest-grid .hint {
+  font-size: 10px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+  display: block;
+  text-transform: uppercase;
+}
+
+.suggest-grid .hint::before {
+  content: "$ ";
+  color: var(--accent);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.theme-toggle button {
+  border: 0;
+  border-radius: 0;
+  padding: 3px 10px;
+  background: transparent;
   color: var(--muted);
 }
 
-.transcript pre {
-  background: var(--elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
+.theme-toggle button[data-active="true"] {
+  background: var(--foreground);
+  color: var(--background);
 }
