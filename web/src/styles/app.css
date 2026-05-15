@@ -1,0 +1,141 @@
+/*
+ * App-specific layout on top of console tokens.
+ * Keep this file thin; promote primitives upstream to console.css when reused.
+ */
+
+.shell {
+  display: grid;
+  grid-template-columns: 224px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  background: var(--sidebar);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-3);
+  gap: var(--space-4);
+  user-select: none;
+}
+
+.sidebar .logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  font-weight: 600;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar nav button {
+  text-align: left;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  color: var(--secondary);
+}
+
+.sidebar nav button[data-active="true"] {
+  background: var(--hover);
+  color: var(--foreground);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.titlebar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.titlebar button,
+.titlebar .pill {
+  -webkit-app-region: no-drag;
+}
+
+.workspace {
+  flex: 1;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 1fr auto;
+}
+
+.transcript {
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-8);
+}
+
+.composer {
+  border-top: 1px solid var(--border-subtle);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  gap: var(--space-3);
+  align-items: end;
+  background: var(--elevated);
+}
+
+.composer textarea {
+  flex: 1;
+  resize: none;
+  min-height: 40px;
+  max-height: 200px;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-family: var(--font-sans);
+}
+
+.composer button {
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 0;
+  font-weight: 500;
+}
+
+.composer button:disabled {
+  background: var(--hover);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.transcript .turn {
+  margin-bottom: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.transcript .role {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.transcript pre {
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}

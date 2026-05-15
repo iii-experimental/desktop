@@ -1,0 +1,274 @@
+/*
+ * iii console design tokens, vendored.
+ * Source of truth: iii-hq/iii / console/packages/console-frontend.
+ * Adopt verbatim — do not introduce app-specific tokens here.
+ */
+
+:root {
+  --background: #000000;
+  --foreground: #f4f4f4;
+  --sidebar: #0a0a0a;
+  --elevated: #111111;
+  --hover: #1a1a1a;
+  --border: #2d2d2d;
+  --border-subtle: #1d1d1d;
+  --muted: #5b5b5b;
+  --secondary: #9ca3af;
+
+  --accent: #f3f724;
+  --accent-text: #000000;
+
+  --success: #22c55e;
+  --warning: #f3f724;
+  --error: #ef4444;
+  --info: #3b82f6;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-full: 9999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --font-sans:
+    "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    "JetBrains Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sans {
+  font-family: var(--font-sans);
+}
+
+.uppercase-label {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--secondary);
+}
+
+.card {
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.vr {
+  width: 1px;
+  background: var(--border);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.pill.neutral {
+  background: var(--hover);
+  color: var(--secondary);
+}
+
+.pill.outline {
+  border: 1px solid var(--border);
+  color: var(--secondary);
+}
+
+.pill.ok {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+}
+
+.pill.warn {
+  background: rgba(243, 247, 36, 0.15);
+  color: var(--warning);
+}
+
+.pill.err {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+}
+
+.pill.info {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--info);
+}
+
+.pill.accent {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.status-dot.ok {
+  background: var(--success);
+}
+.status-dot.warn {
+  background: var(--warning);
+}
+.status-dot.err {
+  background: var(--error);
+}
+.status-dot.idle {
+  background: var(--muted);
+}
+
+.bar-track {
+  height: 4px;
+  background: var(--hover);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+}
+
+.caret {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  background: var(--foreground);
+  vertical-align: middle;
+  animation: caret-blink 1s steps(2) infinite;
+}
+
+.thinking-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: thinking-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes thinking-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes flash-in {
+  from {
+    background: var(--accent);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+button:hover {
+  background: var(--hover);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+}
+
+a {
+  color: var(--info);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-text);
+}

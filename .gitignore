@@ -1,0 +1,34 @@
+target/
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+
+# Lockfiles are never committed in iii-experimental repos
+Cargo.lock
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# TypeScript build cache
+*.tsbuildinfo
+
+*.log
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+src-tauri/gen/
+src-tauri/target/
+src-tauri/WixTools/
+
+web/dist/
+web/.vite/
+
+.claude/
+CLAUDE.md
+.cursorrules
+.aider*
