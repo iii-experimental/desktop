@@ -14,22 +14,40 @@ export function ApprovalRow({ request, onApprove, onReject, pending }: Props) {
       style={{
         margin: "12px 0",
         border: "1px solid var(--accent)",
-        borderRadius: 6,
-        background: "rgba(243, 247, 36, 0.05)",
-        overflow: "hidden",
+        background: "var(--bg)",
       }}
     >
       <div
         style={{
-          padding: "8px 12px",
-          borderBottom: "1px solid var(--border-subtle)",
+          padding: "6px 12px",
+          borderBottom: "1px solid var(--rule)",
           display: "flex",
           alignItems: "center",
           gap: 8,
+          background: "var(--panel)",
         }}
       >
-        <span className="pill accent mono">approval required</span>
-        <code className="mono" style={{ fontSize: 12 }}>
+        <span
+          style={{
+            color: "var(--accent)",
+            fontSize: 11,
+            textTransform: "uppercase",
+            letterSpacing: "0.18em",
+            fontFamily: "var(--font-mono)",
+            fontWeight: 500,
+          }}
+        >
+          approval required
+        </span>
+        <code
+          className="mono"
+          style={{
+            fontSize: 12,
+            color: "var(--ink)",
+            background: "transparent",
+            padding: 0,
+          }}
+        >
           {request.function_id}
         </code>
       </div>
@@ -44,23 +62,35 @@ export function ApprovalRow({ request, onApprove, onReject, pending }: Props) {
           display: "flex",
           gap: 8,
           padding: "8px 12px",
-          borderTop: "1px solid var(--border-subtle)",
+          borderTop: "1px solid var(--rule)",
           justifyContent: "flex-end",
         }}
       >
-        <button onClick={onReject} disabled={pending}>
-          Reject
+        <button
+          onClick={onReject}
+          disabled={pending}
+          style={{
+            padding: "4px 14px",
+            background: "var(--bg)",
+            border: "1px solid var(--rule)",
+            color: "var(--ink)",
+            textTransform: "lowercase",
+          }}
+        >
+          reject
         </button>
         <button
           onClick={onApprove}
           disabled={pending}
           style={{
-            background: "var(--accent)",
-            color: "var(--accent-text)",
-            border: 0,
+            padding: "4px 14px",
+            background: "var(--ink)",
+            color: "var(--bg)",
+            border: "1px solid var(--ink)",
+            textTransform: "lowercase",
           }}
         >
-          Approve
+          approve
         </button>
       </div>
     </div>

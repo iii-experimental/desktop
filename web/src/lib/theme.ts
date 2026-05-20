@@ -5,12 +5,10 @@ export type Theme = "dark" | "light";
 const KEY = "iii-desktop:theme";
 
 function readTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(KEY);
   if (stored === "light" || stored === "dark") return stored;
-  return window.matchMedia?.("(prefers-color-scheme: light)").matches
-    ? "light"
-    : "dark";
+  return "light";
 }
 
 export function useTheme(): [Theme, (next: Theme) => void] {

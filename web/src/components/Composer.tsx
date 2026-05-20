@@ -9,10 +9,10 @@ interface Props {
 }
 
 const SLASH_COMMANDS: Array<{ id: string; description: string }> = [
-  { id: "/clear", description: "Clear current transcript" },
-  { id: "/model", description: "Switch model" },
-  { id: "/new", description: "New session" },
-  { id: "/export", description: "Export transcript as markdown" },
+  { id: "/clear", description: "clear current transcript" },
+  { id: "/model", description: "switch model" },
+  { id: "/new", description: "new session" },
+  { id: "/export", description: "export transcript as markdown" },
 ];
 
 export function Composer({ onSend, onStop, disabled, busy, placeholder }: Props) {
@@ -44,19 +44,17 @@ export function Composer({ onSend, onStop, disabled, busy, placeholder }: Props)
   return (
     <div
       style={{
-        borderTop: "1px solid var(--border-subtle)",
-        background: "var(--elevated)",
-        padding: "10px 14px 14px",
+        borderTop: "1px solid var(--rule)",
+        background: "var(--panel)",
+        padding: "10px 14px 12px",
       }}
     >
       {matched.length > 0 && (
         <div
           style={{
-            border: "1px solid var(--border)",
-            borderRadius: 6,
+            border: "1px solid var(--rule)",
             marginBottom: 8,
-            background: "var(--sidebar)",
-            overflow: "hidden",
+            background: "var(--bg)",
           }}
         >
           {matched.map((c) => (
@@ -70,17 +68,18 @@ export function Composer({ onSend, onStop, disabled, busy, placeholder }: Props)
                 width: "100%",
                 textAlign: "left",
                 border: 0,
-                borderRadius: 0,
+                borderBottom: "1px solid var(--rule-2)",
                 background: "transparent",
                 padding: "6px 12px",
                 display: "flex",
                 justifyContent: "space-between",
+                color: "var(--ink)",
               }}
             >
               <span className="mono" style={{ fontSize: 12 }}>
                 {c.id}
               </span>
-              <span style={{ color: "var(--muted)", fontSize: 12 }}>
+              <span style={{ color: "var(--ink-faint)", fontSize: 12 }}>
                 {c.description}
               </span>
             </button>
@@ -92,17 +91,26 @@ export function Composer({ onSend, onStop, disabled, busy, placeholder }: Props)
           display: "flex",
           gap: 8,
           alignItems: "flex-end",
-          background: "var(--background)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
+          background: "var(--bg)",
+          border: "1px solid var(--rule)",
           padding: "8px 10px",
         }}
       >
+        <span
+          style={{
+            color: "var(--accent)",
+            fontFamily: "var(--font-mono)",
+            fontSize: 13,
+            lineHeight: "20px",
+          }}
+        >
+          $
+        </span>
         <textarea
           ref={ref}
           value={value}
           rows={1}
-          placeholder={placeholder ?? "Ask iii anything…  ⌘K for palette"}
+          placeholder={placeholder ?? "ask iii anything…  ⌘k for palette"}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
@@ -117,43 +125,42 @@ export function Composer({ onSend, onStop, disabled, busy, placeholder }: Props)
             background: "transparent",
             border: 0,
             outline: "none",
-            padding: 4,
-            fontFamily: "var(--font-sans)",
-            fontSize: 14,
-            color: "var(--foreground)",
-            minHeight: 24,
+            padding: 0,
+            fontFamily: "var(--font-mono)",
+            fontSize: 13,
+            color: "var(--ink)",
+            minHeight: 20,
             maxHeight: 220,
+            lineHeight: "20px",
           }}
         />
         {busy && onStop ? (
           <button
             onClick={onStop}
             style={{
-              padding: "6px 14px",
-              background: "transparent",
-              border: "1px solid var(--border)",
-              color: "var(--foreground)",
-              borderRadius: 6,
+              padding: "4px 14px",
+              background: "var(--bg)",
+              border: "1px solid var(--rule)",
+              color: "var(--ink)",
+              textTransform: "lowercase",
             }}
           >
-            Stop
+            stop
           </button>
         ) : (
           <button
             onClick={() => void send()}
             disabled={disabled || !value.trim()}
             style={{
-              padding: "6px 14px",
-              background: "var(--accent)",
-              color: "var(--accent-text)",
-              border: 0,
-              borderRadius: 6,
-              fontWeight: 500,
+              padding: "4px 14px",
+              background: value.trim() ? "var(--ink)" : "var(--bg)",
+              color: value.trim() ? "var(--bg)" : "var(--ink-ghost)",
+              border: `1px solid ${value.trim() ? "var(--ink)" : "var(--rule)"}`,
               cursor: !value.trim() ? "not-allowed" : "pointer",
-              opacity: !value.trim() ? 0.5 : 1,
+              textTransform: "lowercase",
             }}
           >
-            Send
+            send
           </button>
         )}
       </div>
@@ -162,8 +169,10 @@ export function Composer({ onSend, onStop, disabled, busy, placeholder }: Props)
           display: "flex",
           justifyContent: "space-between",
           marginTop: 6,
-          color: "var(--muted)",
+          color: "var(--ink-ghost)",
           fontSize: 11,
+          fontFamily: "var(--font-mono)",
+          textTransform: "lowercase",
         }}
       >
         <span>

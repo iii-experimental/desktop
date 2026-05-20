@@ -37,8 +37,7 @@ export function CommandPalette({ items }: Props) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0, 0, 0, 0.55)",
-        backdropFilter: "blur(2px)",
+        background: "rgba(10, 10, 10, 0.35)",
         zIndex: 1000,
         display: "flex",
         alignItems: "flex-start",
@@ -50,38 +49,63 @@ export function CommandPalette({ items }: Props) {
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "min(640px, 92vw)",
-          background: "var(--elevated)",
-          border: "1px solid var(--border)",
-          borderRadius: 10,
+          background: "var(--bg)",
+          border: "1px solid var(--ink)",
           overflow: "hidden",
-          boxShadow: "0 12px 32px rgba(0,0,0,0.6)",
         }}
       >
-        <Command label="Command palette">
-          <Command.Input
-            autoFocus
-            placeholder="Type a command…"
+        <Command label="command palette">
+          <div
             style={{
-              width: "100%",
-              border: 0,
-              borderBottom: "1px solid var(--border-subtle)",
-              padding: "14px 16px",
-              outline: "none",
-              fontSize: 15,
-              background: "transparent",
-              color: "var(--foreground)",
-              borderRadius: 0,
+              display: "flex",
+              alignItems: "center",
+              borderBottom: "1px solid var(--rule)",
+              padding: "12px 16px",
+              gap: 10,
             }}
-          />
+          >
+            <span
+              style={{
+                color: "var(--accent)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 14,
+              }}
+            >
+              $
+            </span>
+            <Command.Input
+              autoFocus
+              placeholder="type a command…"
+              style={{
+                flex: 1,
+                border: 0,
+                padding: 0,
+                outline: "none",
+                fontSize: 14,
+                background: "transparent",
+                color: "var(--ink)",
+                fontFamily: "var(--font-mono)",
+                textTransform: "lowercase",
+              }}
+            />
+          </div>
           <Command.List
             style={{
               maxHeight: 360,
               overflowY: "auto",
-              padding: 6,
+              padding: 0,
             }}
           >
-            <Command.Empty style={{ padding: 16, color: "var(--muted)" }}>
-              No matches.
+            <Command.Empty
+              style={{
+                padding: 16,
+                color: "var(--ink-ghost)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 12,
+                textTransform: "lowercase",
+              }}
+            >
+              no matches.
             </Command.Empty>
             {(["session", "view", "model", "action"] as const).map((group) => {
               const groupItems = items.filter((i) => i.group === group);
@@ -97,18 +121,21 @@ export function CommandPalette({ items }: Props) {
                         void it.run();
                       }}
                       style={{
-                        padding: "8px 12px",
-                        borderRadius: 6,
+                        padding: "6px 16px",
                         display: "flex",
                         justifyContent: "space-between",
                         cursor: "pointer",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 13,
+                        color: "var(--ink)",
+                        textTransform: "lowercase",
                       }}
                     >
                       <span>{it.label}</span>
                       {it.hint && (
                         <span
                           className="mono"
-                          style={{ color: "var(--muted)", fontSize: 12 }}
+                          style={{ color: "var(--ink-ghost)", fontSize: 12 }}
                         >
                           {it.hint}
                         </span>

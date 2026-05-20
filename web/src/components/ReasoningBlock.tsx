@@ -13,10 +13,8 @@ export function ReasoningBlock({ text, open = false }: Props) {
     <div
       style={{
         margin: "8px 0",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: 6,
-        background: "var(--sidebar)",
-        overflow: "hidden",
+        border: "1px solid var(--rule)",
+        background: "var(--panel)",
       }}
     >
       <button
@@ -27,30 +25,30 @@ export function ReasoningBlock({ text, open = false }: Props) {
           padding: "6px 12px",
           background: "transparent",
           border: 0,
-          borderRadius: 0,
           display: "flex",
           alignItems: "center",
           gap: 8,
-          color: "var(--secondary)",
+          color: "var(--ink-faint)",
           fontSize: 11,
           textTransform: "uppercase",
-          letterSpacing: "0.06em",
+          letterSpacing: "0.18em",
           fontFamily: "var(--font-mono)",
         }}
       >
         <span>{expanded ? "▾" : "▸"}</span>
         <span>reasoning</span>
-        <span style={{ marginLeft: "auto" }}>
+        <span style={{ marginLeft: "auto", letterSpacing: "0.06em" }}>
           {text.length} chars
         </span>
       </button>
       {expanded && (
         <div
           style={{
-            padding: "0 16px 8px",
-            color: "var(--secondary)",
-            fontSize: 13,
-            borderTop: "1px solid var(--border-subtle)",
+            padding: "0 16px 10px",
+            color: "var(--ink-faint)",
+            fontSize: 12.5,
+            borderTop: "1px solid var(--rule-2)",
+            paddingTop: 8,
           }}
         >
           <Markdown text={text} />

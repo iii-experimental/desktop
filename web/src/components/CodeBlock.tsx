@@ -1,6 +1,6 @@
 import { useState } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import { atomOneLight } from "react-syntax-highlighter/dist/esm/styles/hljs";
 
 interface Props {
   code: string;
@@ -9,12 +9,12 @@ interface Props {
 }
 
 const THEME = {
-  ...atomOneDark,
+  ...atomOneLight,
   hljs: {
-    ...(atomOneDark as { hljs?: Record<string, string> }).hljs,
-    background: "var(--elevated)",
-    color: "var(--foreground)",
-    padding: "12px",
+    ...(atomOneLight as { hljs?: Record<string, string> }).hljs,
+    background: "var(--bg)",
+    color: "var(--ink)",
+    padding: "16px 20px",
   },
 };
 
@@ -26,10 +26,10 @@ export function CodeBlock({ code, language, inline }: Props) {
       <code
         className="mono"
         style={{
-          background: "var(--hover)",
-          padding: "1px 6px",
-          borderRadius: 4,
+          background: "var(--panel)",
+          padding: "0 5px",
           fontSize: "0.92em",
+          color: "var(--ink)",
         }}
       >
         {code}
@@ -43,10 +43,9 @@ export function CodeBlock({ code, language, inline }: Props) {
     <div
       style={{
         position: "relative",
-        margin: "12px 0",
-        border: "1px solid var(--border)",
-        borderRadius: 6,
-        overflow: "hidden",
+        margin: "10px 0",
+        border: "1px solid var(--rule)",
+        background: "var(--bg)",
       }}
     >
       <div
@@ -54,13 +53,14 @@ export function CodeBlock({ code, language, inline }: Props) {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "6px 12px",
-          background: "var(--hover)",
+          padding: "6px 14px",
+          background: "var(--panel)",
           fontSize: 11,
           fontFamily: "var(--font-mono)",
-          color: "var(--secondary)",
+          color: "var(--ink-faint)",
           textTransform: "uppercase",
-          letterSpacing: "0.06em",
+          letterSpacing: "0.18em",
+          borderBottom: "1px solid var(--rule)",
         }}
       >
         <span>{lang}</span>
@@ -73,7 +73,7 @@ export function CodeBlock({ code, language, inline }: Props) {
           style={{
             border: 0,
             background: "transparent",
-            color: "var(--secondary)",
+            color: "var(--ink-faint)",
             padding: 0,
             fontSize: 11,
             cursor: "pointer",
@@ -89,9 +89,10 @@ export function CodeBlock({ code, language, inline }: Props) {
         style={THEME}
         customStyle={{
           margin: 0,
-          background: "var(--elevated)",
+          background: "var(--bg)",
           fontSize: 12.5,
           lineHeight: 1.55,
+          padding: "16px 20px",
         }}
         codeTagProps={{ style: { fontFamily: "var(--font-mono)" } }}
       >

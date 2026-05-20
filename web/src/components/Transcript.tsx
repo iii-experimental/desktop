@@ -12,10 +12,10 @@ interface Props {
 }
 
 const SUGGESTIONS: Array<{ hint: string; text: string }> = [
-  { hint: "explore", text: "What can you do?" },
-  { hint: "code", text: "Write a Rust function that streams a CSV file" },
-  { hint: "files", text: "List the files in this directory" },
-  { hint: "explain", text: "Explain the iii engine in one paragraph" },
+  { hint: "explore", text: "what can you do?" },
+  { hint: "files", text: "list files in this directory" },
+  { hint: "code", text: "write a rust function that streams a csv file" },
+  { hint: "explain", text: "explain the iii engine in one paragraph" },
 ];
 
 export function Transcript({ messages, pending, thinking, onSuggest }: Props) {
@@ -110,22 +110,24 @@ function RoleBadge({ role, ts }: { role: Message["role"]; ts: number }) {
         alignItems: "center",
         gap: 8,
         marginBottom: 6,
-        color: "var(--muted)",
+        color: "var(--ink-ghost)",
       }}
     >
       <span
         style={{
           fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          letterSpacing: "0.1em",
+          fontSize: 11,
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
-          color: role === "system" ? "var(--error)" : "var(--accent)",
+          fontWeight: 500,
+          color: role === "system" ? "var(--alert)" : "var(--ink-faint)",
         }}
       >
         {role === "system" ? "system" : "iii"}
       </span>
       <span
-        style={{ fontFamily: "var(--font-mono)", fontSize: 10 }}
+        className="mono"
+        style={{ fontSize: 10, color: "var(--ink-ghost)" }}
       >
         {fmt}
       </span>
@@ -166,24 +168,38 @@ function InlineThinking() {
 
 function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   return (
-    <div style={{ color: "var(--muted)", marginTop: "10vh" }}>
+    <div style={{ color: "var(--ink-faint)", marginTop: "10vh" }}>
       <div style={{ textAlign: "center", marginBottom: 8 }}>
         <div
           style={{
+            color: "var(--accent)",
+            fontSize: 11,
+            textTransform: "uppercase",
+            letterSpacing: "0.18em",
             fontFamily: "var(--font-mono)",
-            fontSize: 14,
-            color: "var(--foreground)",
-            fontWeight: 700,
+            marginBottom: 8,
           }}
         >
-          iii <span style={{ color: "var(--muted)" }}>/</span> desktop
+          $ desktop
         </div>
         <div
           style={{
-            color: "var(--secondary)",
-            fontSize: 11,
-            marginTop: 6,
-            letterSpacing: "0.04em",
+            fontFamily: "var(--font-mono)",
+            fontSize: 28,
+            color: "var(--ink)",
+            fontWeight: 500,
+            letterSpacing: "-0.01em",
+            textTransform: "lowercase",
+          }}
+        >
+          iii <span style={{ color: "var(--ink-ghost)" }}>/</span> desktop
+        </div>
+        <div
+          style={{
+            color: "var(--ink-faint)",
+            fontSize: 13,
+            marginTop: 8,
+            textTransform: "lowercase",
           }}
         >
           native chat on iii primitives
@@ -193,12 +209,13 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
         style={{
           textAlign: "center",
           fontSize: 11,
-          color: "var(--muted)",
+          color: "var(--ink-faint)",
           marginTop: 14,
           fontFamily: "var(--font-mono)",
+          textTransform: "lowercase",
         }}
       >
-        <kbd>⌘K</kbd> palette · <kbd>⌘N</kbd> new · <kbd>⏎</kbd> send
+        <kbd>⌘k</kbd> palette · <kbd>⌘n</kbd> new · <kbd>⏎</kbd> send
       </div>
       <div className="suggest-grid">
         {SUGGESTIONS.map((s) => (

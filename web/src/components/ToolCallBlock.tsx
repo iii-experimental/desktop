@@ -54,10 +54,8 @@ export function ToolCallBlock({ call }: Props) {
     <div
       style={{
         margin: "10px 0",
-        border: "1px solid var(--border)",
-        borderRadius: 6,
-        background: "var(--elevated)",
-        overflow: "hidden",
+        border: "1px solid var(--rule)",
+        background: "var(--bg)",
       }}
     >
       <button
@@ -67,22 +65,23 @@ export function ToolCallBlock({ call }: Props) {
           gap: 8,
           alignItems: "center",
           width: "100%",
-          padding: "7px 12px",
+          padding: "6px 12px",
           border: 0,
-          borderRadius: 0,
-          background: "transparent",
+          background: "var(--panel)",
           textAlign: "left",
+          color: "var(--ink)",
+          borderBottom: expanded ? "1px solid var(--rule-2)" : 0,
         }}
       >
-        <span style={{ color: "var(--muted)" }}>{expanded ? "▾" : "▸"}</span>
+        <span style={{ color: "var(--ink-faint)" }}>{expanded ? "▾" : "▸"}</span>
         <code
           className="mono"
           style={{
-            background: "var(--hover)",
-            padding: "1px 8px",
-            borderRadius: 4,
-            fontSize: 12,
-            color: "var(--accent)",
+            background: "transparent",
+            padding: 0,
+            fontSize: 12.5,
+            color: "var(--ink)",
+            fontWeight: 500,
           }}
         >
           {call.function_id}
@@ -93,8 +92,8 @@ export function ToolCallBlock({ call }: Props) {
         )}
       </button>
       {expanded && (
-        <div style={{ borderTop: "1px solid var(--border-subtle)", padding: 10 }}>
-          <div className="uppercase-label" style={{ marginBottom: 4 }}>
+        <div style={{ padding: 12 }}>
+          <div className="uppercase-label" style={{ marginBottom: 6 }}>
             args
           </div>
           <CodeBlock
@@ -105,7 +104,7 @@ export function ToolCallBlock({ call }: Props) {
             <>
               <div
                 className="uppercase-label"
-                style={{ marginTop: 10, marginBottom: 4 }}
+                style={{ marginTop: 12, marginBottom: 6 }}
               >
                 {call.status === "error" ? "error" : "result"}
               </div>

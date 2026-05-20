@@ -17,9 +17,19 @@ function statusClass(c: ConnectionState): string {
 export function Titlebar({ connection, sessionTitle, children }: Props) {
   return (
     <header className="titlebar">
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <span className={`status-dot ${statusClass(connection)}`} />
-        <span className="mono uppercase-label">{sessionTitle}</span>
+        <span
+          className="mono"
+          style={{
+            fontSize: 11,
+            color: "var(--ink-faint)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+          }}
+        >
+          {sessionTitle}
+        </span>
       </div>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         {children}
