@@ -38,7 +38,14 @@ export interface SessionRow {
   updated_at: number;
 }
 
-export type Tab = "chat" | "cost" | "files" | "activity" | "status";
+export type Tab =
+  | "chat"
+  | "traces"
+  | "directory"
+  | "activity"
+  | "files"
+  | "cost"
+  | "status";
 
 export interface ApprovalRequest {
   id: string;

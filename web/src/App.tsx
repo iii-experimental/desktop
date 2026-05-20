@@ -4,7 +4,9 @@ import { CommandPalette } from "./components/CommandPalette";
 import { Composer } from "./components/Composer";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { CostPanel } from "./components/CostPanel";
+import { DirectoryPanel } from "./components/DirectoryPanel";
 import { FilesystemPanel } from "./components/FilesystemPanel";
+import { TracesPanel } from "./components/TracesPanel";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { useTheme } from "./lib/theme";
 import { ModelPicker, type ModelOption } from "./components/ModelPicker";
@@ -274,7 +276,7 @@ export default function App() {
         group: "session" as const,
         run: () => setUserMessages([]),
       },
-      ...(["chat", "activity", "files", "cost", "status"] as const).map((t, i) => ({
+      ...(["chat", "traces", "directory", "activity", "files", "cost", "status"] as const).map((t, i) => ({
         id: `view-${t}`,
         label: `View ${t}`,
         hint: `⌘${i + 1}`,
@@ -344,9 +346,11 @@ export default function App() {
               />
             </>
           )}
-          {tab === "cost" && <CostPanel messages={allMessages} />}
-          {tab === "files" && <FilesystemPanel />}
+          {tab === "traces" && <TracesPanel />}
+          {tab === "directory" && <DirectoryPanel />}
           {tab === "activity" && <ActivityPanel />}
+          {tab === "files" && <FilesystemPanel />}
+          {tab === "cost" && <CostPanel messages={allMessages} />}
           {tab === "status" && <StatusPanel />}
         </div>
       </main>
@@ -365,11 +369,13 @@ interface SidebarProps {
 }
 
 const TABS: { id: Tab; label: string; hint: string }[] = [
-  { id: "chat", label: "Chat", hint: "⌘1" },
-  { id: "activity", label: "Activity", hint: "⌘2" },
-  { id: "files", label: "Files", hint: "⌘3" },
-  { id: "cost", label: "Cost", hint: "⌘4" },
-  { id: "status", label: "Status", hint: "⌘5" },
+  { id: "chat", label: "chat", hint: "⌘1" },
+  { id: "traces", label: "traces", hint: "⌘2" },
+  { id: "directory", label: "directory", hint: "⌘3" },
+  { id: "activity", label: "activity", hint: "⌘4" },
+  { id: "files", label: "files", hint: "⌘5" },
+  { id: "cost", label: "cost", hint: "⌘6" },
+  { id: "status", label: "status", hint: "⌘7" },
 ];
 
 function Sidebar({
