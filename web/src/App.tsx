@@ -235,16 +235,17 @@ export default function App() {
     async (id: string, decision: "approve" | "reject") => {
       try {
         const client = await getIiiClient();
-        await client.call("approval::respond", {
-          request_id: id,
-          decision,
+        await client.call("approval::resolve", {
+          session_id: sessionId,
+          function_call_id: id,
+          decision: decision === "approve" ? "allow" : "deny",
         });
       } catch (err) {
-        console.warn("approval respond failed", formatError(err));
+        console.warn("approval resolve failed", formatError(err));
       }
       setApprovals((a) => a.filter((x) => x.id !== id));
     },
-    [],
+    [sessionId],
   );
 
   const stop = useCallback(async () => {
