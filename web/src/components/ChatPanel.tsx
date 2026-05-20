@@ -51,7 +51,13 @@ export function ChatPanel({
         ctxPercent={ctxPercent}
         ctxUsed={ctxUsed}
         ctxMax={ctxMax}
-        status={turnActive ? "busy" : "ready"}
+        status={
+          stream.pausedForApproval
+            ? "paused"
+            : turnActive
+              ? "busy"
+              : "ready"
+        }
       />
       <div style={{ overflowY: "auto" }}>
         <Transcript

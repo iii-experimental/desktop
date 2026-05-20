@@ -1,149 +1,123 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getIiiClient } from "../lib/iii-client";
-
-interface StoredSpan {
-  trace_id: string;
-  span_id: string;
-  parent_span_id?: string;
-  name: string;
-  start_time_unix_nano: number;
-  end_time_unix_nano: number;
-  status: string;
-  attributes?: Array<[string, unknown]>;
-  service_name?: string;
-}
-
-interface TracesResponse {
-  spans: StoredSpan[];
-  total: number;
-}
-
-interface TraceRow {
-  trace_id: string;
-  root_op: string;
-  status: "ok" | "error" | "pending";
-  start_ms: number;
-  duration_ms: number;
-  span_count: number;
-  services: string[];
-}
-
-function formatRelative(ms: number): string {
-  const diff = Date.now() - ms;
-  if (diff < 1000) return "just now";
-  if (diff < 60_000) return `${Math.floor(diff / 1000)}s`;
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
-  return `${Math.floor(diff / 86_400_000)}d`;
-}
-
-function groupSpans(spans: StoredSpan[]): TraceRow[] {
-  const byTrace = new Map<string, StoredSpan[]>();
-  for (const s of spans) {
-    const arr = byTrace.get(s.trace_id) ?? [];
-    arr.push(s);
-    byTrace.set(s.trace_id, arr);
-  }
-  const rows: TraceRow[] = [];
-  for (const [trace_id, group] of byTrace) {
-    const root = group.find((s) => !s.parent_span_id) ?? group[0];
-    if (!root) continue;
-    const start = root.start_time_unix_nano / 1_000_000;
-    const end = Math.max(
-      ...group.map((s) => s.end_time_unix_nano / 1_000_000),
-    );
-    const services = Array.from(
-      new Set(group.map((s) => s.service_name ?? "?").filter(Boolean)),
-    );
-    const hasError = group.some((s) => s.status === "error");
-    rows.push({
-      trace_id,
-      root_op: root.name,
-      status: hasError ? "error" : "ok",
-      start_ms: start,
-      duration_ms: Math.max(0, end - start),
-      span_count: group.length,
-      services,
-    });
-  }
-  rows.sort((a, b) => b.start_ms - a.start_ms);
-  return rows;
-}
+import { useEffect, useMemo, useState } from "react";
+import {
+  fetchTraceTree,
+  isMemoryExporterMissing,
+} from "../lib/traces-api";
+import {
+  toWaterfallData,
+  treeToWaterfallData,
+  type VisualizationSpan,
+  type WaterfallData,
+} from "../lib/trace-transform";
+import { useResizablePanels } from "../lib/use-resizable-panels";
+import { useTraceData } from "../lib/use-trace-data";
+import { FlameGraph } from "./traces/FlameGraph";
+import { FlowView } from "./traces/FlowView";
+import { TraceList } from "./traces/TraceList";
+import { TraceMap } from "./traces/TraceMap";
+import { SpanPanel } from "./traces/SpanPanel";
+import { ViewSwitcher, type TraceView } from "./traces/ViewSwitcher";
+import { WaterfallChart } from "./traces/WaterfallChart";
 
 export function TracesPanel() {
-  const [rows, setRows] = useState<TraceRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [otelMissing, setOtelMissing] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [paused, setPaused] = useState(false);
+  const {
+    traces,
+    spans,
+    newTraceIds,
+    acknowledgeNew,
+    loading,
+    paused,
+    setPaused,
+    refresh,
+    clear,
+    hasOtelConfigured,
+    isHoveredRef,
+    flushPending,
+    errorMessage,
+  } = useTraceData();
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const client = await getIiiClient();
-      const result = await client.call<TracesResponse>("engine::traces::list", {
-        limit: 200,
-        offset: 0,
-        include_internal: false,
-      });
-      setOtelMissing(false);
-      setRows(groupSpans(result.spans ?? []));
-    } catch (err) {
-      const message =
-        err && typeof err === "object" && "code" in err
-          ? String((err as { code?: string }).code ?? "")
-          : "";
-      if (message === "memory_exporter_not_enabled") {
-        setOtelMissing(true);
-      } else {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    containerRef,
+    traceWidth,
+    spanWidth,
+    spanOpen,
+    setSpanOpen,
+    onTraceDragStart,
+    onSpanDragStart,
+  } = useResizablePanels();
+
+  const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
+  const [selectedSpanId, setSelectedSpanId] = useState<string | null>(null);
+  const [view, setView] = useState<TraceView>("waterfall");
+  const [traceTree, setTraceTree] = useState<WaterfallData | null>(null);
+  const [treeError, setTreeError] = useState<string | null>(null);
 
   useEffect(() => {
-    void refresh();
-    if (paused) return;
-    const interval = setInterval(refresh, 3000);
-    return () => clearInterval(interval);
-  }, [refresh, paused]);
-
-  const clear = useCallback(async () => {
-    try {
-      const client = await getIiiClient();
-      await client.call("engine::traces::clear", {});
-      void refresh();
-    } catch {
-      // ignore
+    if (!selectedTraceId) {
+      setTraceTree(null);
+      return;
     }
-  }, [refresh]);
+    let cancelled = false;
+    setTreeError(null);
+    void (async () => {
+      try {
+        const tree = await fetchTraceTree(selectedTraceId);
+        if (cancelled) return;
+        const fromTree = treeToWaterfallData(tree.roots ?? []);
+        if (fromTree) {
+          setTraceTree(fromTree);
+          return;
+        }
+        // Fallback to flat span list filtered by trace id
+        setTraceTree(toWaterfallData(spans, selectedTraceId));
+      } catch (err) {
+        if (cancelled) return;
+        if (isMemoryExporterMissing(err)) {
+          setTreeError("otel exporter not enabled");
+          return;
+        }
+        // Fallback: derive from already-fetched spans
+        setTraceTree(toWaterfallData(spans, selectedTraceId));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTraceId, spans]);
+
+  const selectedSpan = useMemo<VisualizationSpan | null>(() => {
+    if (!traceTree || !selectedSpanId) return null;
+    return traceTree.spans.find((s) => s.span_id === selectedSpanId) ?? null;
+  }, [traceTree, selectedSpanId]);
+
+  // Auto-open span panel on selection
+  useEffect(() => {
+    if (selectedSpanId && !spanOpen) setSpanOpen(true);
+  }, [selectedSpanId, spanOpen, setSpanOpen]);
 
   const totals = useMemo(() => {
-    const errs = rows.filter((r) => r.status === "error").length;
-    return { count: rows.length, errors: errs };
-  }, [rows]);
+    const errs = traces.filter((r) => r.status === "error").length;
+    return { count: traces.length, errors: errs };
+  }, [traces]);
 
   return (
     <section
       style={{
-        padding: 24,
-        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
         height: "100%",
-        maxWidth: 960,
-        margin: "0 auto",
-        width: "100%",
+        background: "var(--bg)",
         fontFamily: "var(--font-mono)",
       }}
     >
       <header
         style={{
           display: "flex",
-          alignItems: "flex-start",
+          alignItems: "flex-end",
           justifyContent: "space-between",
-          marginBottom: 14,
+          padding: "12px 18px 8px",
+          borderBottom: "1px solid var(--rule)",
+          background: "var(--bg)",
         }}
       >
         <div>
@@ -153,7 +127,7 @@ export function TracesPanel() {
               fontSize: 11,
               textTransform: "uppercase",
               letterSpacing: "0.18em",
-              marginBottom: 4,
+              marginBottom: 2,
             }}
           >
             $ traces
@@ -161,13 +135,16 @@ export function TracesPanel() {
           <h2
             style={{
               margin: 0,
-              fontSize: 28,
+              fontSize: 22,
               fontWeight: 500,
               textTransform: "lowercase",
               letterSpacing: "-0.02em",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
             }}
           >
-            traces{" "}
+            traces
             {paused && (
               <span
                 style={{
@@ -175,10 +152,8 @@ export function TracesPanel() {
                   letterSpacing: "0.18em",
                   color: "var(--ink-faint)",
                   textTransform: "uppercase",
-                  marginLeft: 8,
-                  verticalAlign: "middle",
                   border: "1px solid var(--rule)",
-                  padding: "1px 6px",
+                  padding: "1px 8px",
                 }}
               >
                 paused
@@ -186,220 +161,252 @@ export function TracesPanel() {
             )}
           </h2>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button
-            onClick={() => setPaused((v) => !v)}
-            style={{ padding: "4px 12px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <span
+            className="mono"
+            style={{
+              fontSize: 11,
+              color: "var(--ink-faint)",
+              marginRight: 8,
+            }}
           >
-            <span aria-hidden>{paused ? "▷" : "⏸"}</span>
-            {paused ? "resume" : "pause"}
+            <span className="pill mono info" style={{ fontSize: 11 }}>
+              # {totals.count} traces
+            </span>{" "}
+            <span className="pill mono err" style={{ fontSize: 11 }}>
+              ● {totals.errors} errors
+            </span>
+          </span>
+          <button
+            onClick={() => setPaused(!paused)}
+            style={{ padding: "4px 12px", fontSize: 12 }}
+          >
+            {paused ? "▷ resume" : "⏸ pause"}
           </button>
-          <button onClick={() => void refresh()} disabled={loading} style={{ padding: "4px 12px", fontSize: 12 }}>
+          <button
+            onClick={() => void refresh()}
+            disabled={loading}
+            style={{ padding: "4px 12px", fontSize: 12 }}
+          >
             ↻ refresh
           </button>
-          <button onClick={() => void clear()} style={{ padding: "4px 12px", fontSize: 12 }}>
+          <button
+            onClick={() => void clear()}
+            style={{ padding: "4px 12px", fontSize: 12 }}
+          >
             clear
           </button>
         </div>
       </header>
 
+      {!hasOtelConfigured && (
+        <div
+          style={{
+            margin: "12px 18px",
+            border: "1px solid var(--warn)",
+            padding: 12,
+            color: "var(--warn)",
+            fontSize: 12,
+            lineHeight: 1.6,
+          }}
+        >
+          otel exporter not enabled. add{" "}
+          <code style={{ background: "var(--panel)", padding: "0 4px" }}>
+            iii-observability
+          </code>{" "}
+          worker with{" "}
+          <code style={{ background: "var(--panel)", padding: "0 4px" }}>
+            exporter: memory
+          </code>{" "}
+          and restart the engine.
+        </div>
+      )}
+
+      {errorMessage && (
+        <div
+          style={{
+            margin: "12px 18px",
+            border: "1px solid var(--alert)",
+            padding: 8,
+            color: "var(--alert)",
+            fontSize: 12,
+          }}
+        >
+          {errorMessage}
+        </div>
+      )}
+
       <div
+        ref={containerRef as React.RefObject<HTMLDivElement>}
         style={{
+          flex: 1,
           display: "flex",
-          gap: 8,
-          marginBottom: 14,
-          alignItems: "center",
-          flexWrap: "wrap",
+          minHeight: 0,
+          overflow: "hidden",
         }}
       >
         <div
-          className="cmd-box"
-          style={{ flex: 1, minWidth: 240, fontSize: 12 }}
+          style={{
+            width: traceWidth,
+            flexShrink: 0,
+            borderRight: "1px solid var(--rule)",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
         >
-          <input
-            type="search"
-            placeholder="search traces…"
-            style={{
-              flex: 1,
-              border: 0,
-              background: "transparent",
-              outline: "none",
-              padding: 0,
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              color: "var(--ink)",
+          <TraceList
+            items={traces}
+            selectedId={selectedTraceId}
+            onSelect={(id) => {
+              setSelectedTraceId(id);
+              setSelectedSpanId(null);
+            }}
+            newIds={newTraceIds}
+            onAcknowledgeNew={acknowledgeNew}
+            onHover={(hovered) => {
+              isHoveredRef.current = hovered;
+              if (!hovered) flushPending();
             }}
           />
         </div>
-        {(["no grouping", "message", "session", "function"] as const).map((g) => (
-          <span
-            key={g}
-            className="pill mono"
-            style={{
-              padding: "3px 10px",
-              fontSize: 11,
-              color: g === "no grouping" ? "var(--ink)" : "var(--ink-faint)",
-              borderColor: g === "no grouping" ? "var(--ink)" : "var(--rule)",
-            }}
-          >
-            {g}
-          </span>
-        ))}
-        <span style={{ width: 1, height: 18, background: "var(--rule)" }} />
-        {(["all", "ok", "error", "unset"] as const).map((s) => (
-          <span
-            key={s}
-            className={`pill mono ${s === "all" ? "info" : s === "error" ? "err" : s === "ok" ? "ok" : "neutral"}`}
-            style={{ padding: "3px 10px", fontSize: 11 }}
-          >
-            {s}
-          </span>
-        ))}
-        <span style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
-          <span className="pill mono info" style={{ fontSize: 11 }}>
-            # {totals.count} traces
-          </span>
-          <span className="pill mono err" style={{ fontSize: 11 }}>
-            ● {totals.errors} errors
-          </span>
-        </span>
-      </div>
-
-      {otelMissing && (
+        <button
+          aria-label="resize trace list"
+          onMouseDown={onTraceDragStart}
+          className="resize-handle"
+          style={{ border: 0, padding: 0 }}
+        />
         <div
           style={{
-            border: "1px solid var(--warn)",
-            padding: 14,
-            color: "var(--warn)",
-            fontSize: 12.5,
-            lineHeight: 1.7,
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+            minWidth: 0,
           }}
         >
           <div
             style={{
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: "0.18em",
-              marginBottom: 4,
-            }}
-          >
-            otel exporter not enabled
-          </div>
-          <div style={{ color: "var(--ink-faint)" }}>
-            set <code style={{ background: "var(--panel)", padding: "0 4px" }}>exporter: memory</code> in your{" "}
-            <code style={{ background: "var(--panel)", padding: "0 4px" }}>config.yaml</code> under the iii-observability
-            block. restart the engine and traces will start landing here.
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div style={{ border: "1px solid var(--alert)", padding: 10, color: "var(--alert)", fontSize: 12 }}>
-          {error}
-        </div>
-      )}
-
-      {!otelMissing && !error && rows.length === 0 && (
-        <div
-          style={{
-            padding: 24,
-            color: "var(--ink-ghost)",
-            fontSize: 12.5,
-            border: "1px solid var(--rule)",
-            textAlign: "center",
-            textTransform: "lowercase",
-          }}
-        >
-          no traces yet. run a turn and they'll stream in.
-        </div>
-      )}
-
-      {!otelMissing && rows.length > 0 && (
-        <div className="card">
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "16px 1fr auto auto 80px",
-              gap: 12,
-              padding: "8px 14px",
+              padding: "8px 12px",
               borderBottom: "1px solid var(--rule)",
-              background: "var(--panel)",
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              color: "var(--ink-faint)",
-              fontWeight: 500,
+              background: "var(--bg)",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
             }}
           >
-            <span></span>
-            <span>op</span>
-            <span>spans</span>
-            <span>duration</span>
-            <span>when</span>
+            <ViewSwitcher value={view} onChange={setView} />
+            <div
+              className="mono"
+              style={{
+                fontSize: 11,
+                color: "var(--ink-ghost)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                flex: 1,
+              }}
+            >
+              {selectedTraceId
+                ? selectedTraceId
+                : "select a trace from the list"}
+            </div>
+            {!spanOpen && selectedTraceId && (
+              <button
+                onClick={() => setSpanOpen(true)}
+                style={{
+                  padding: "3px 10px",
+                  fontSize: 11,
+                  background: "var(--bg)",
+                  border: "1px solid var(--rule)",
+                  color: "var(--ink-faint)",
+                  textTransform: "lowercase",
+                }}
+              >
+                + attributes
+              </button>
+            )}
           </div>
-          {rows.map((r) => (
-            <TraceRow key={r.trace_id} row={r} />
-          ))}
+          <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
+            {!selectedTraceId && (
+              <EmptyDetail message="pick a trace on the left to view its waterfall" />
+            )}
+            {selectedTraceId && treeError && (
+              <EmptyDetail message={treeError} />
+            )}
+            {selectedTraceId && traceTree && view === "waterfall" && (
+              <WaterfallChart
+                data={traceTree}
+                selectedSpanId={selectedSpanId}
+                onSelectSpan={setSelectedSpanId}
+              />
+            )}
+            {selectedTraceId && traceTree && view === "flame" && (
+              <FlameGraph
+                data={traceTree}
+                selectedSpanId={selectedSpanId}
+                onSelectSpan={setSelectedSpanId}
+              />
+            )}
+            {selectedTraceId && traceTree && view === "map" && (
+              <TraceMap data={traceTree} />
+            )}
+            {selectedTraceId && traceTree && view === "flow" && (
+              <FlowView
+                data={traceTree}
+                selectedSpanId={selectedSpanId}
+                onSelectSpan={setSelectedSpanId}
+              />
+            )}
+          </div>
         </div>
-      )}
+        {spanOpen && (
+          <>
+            <button
+              aria-label="resize span panel"
+              onMouseDown={onSpanDragStart}
+              className="resize-handle"
+              style={{ border: 0, padding: 0 }}
+            />
+            <div
+              style={{
+                width: spanWidth,
+                flexShrink: 0,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <SpanPanel
+                span={selectedSpan}
+                onClose={() => setSpanOpen(false)}
+                onSelectSpan={setSelectedSpanId}
+              />
+            </div>
+          </>
+        )}
+      </div>
     </section>
   );
 }
 
-function TraceRow({ row }: { row: TraceRow }) {
-  const dot = row.status === "error" ? "err" : "ok";
+function EmptyDetail({ message }: { message: string }) {
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "16px 1fr auto auto 80px",
-        gap: 12,
-        padding: "6px 14px",
-        borderBottom: "1px solid var(--rule-2)",
+        height: "100%",
+        display: "flex",
         alignItems: "center",
+        justifyContent: "center",
+        color: "var(--ink-ghost)",
         fontSize: 12,
-        borderLeft:
-          row.status === "error"
-            ? "2px solid var(--alert)"
-            : "2px solid transparent",
+        textTransform: "lowercase",
+        letterSpacing: "0.06em",
+        padding: 24,
+        textAlign: "center",
       }}
     >
-      <span className={`status-dot ${dot}`} />
-      <span
-        className="mono"
-        style={{
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          color: "var(--ink)",
-        }}
-      >
-        {row.root_op}
-        {row.services.length > 0 && (
-          <span style={{ color: "var(--ink-ghost)", marginLeft: 8 }}>
-            {row.services.join(",")}
-          </span>
-        )}
-      </span>
-      <span style={{ color: "var(--ink-faint)" }}>{row.span_count}</span>
-      <span
-        className="mono"
-        style={{ color: "var(--ink-faint)", fontVariantNumeric: "tabular-nums" }}
-      >
-        {row.duration_ms < 1
-          ? `${(row.duration_ms * 1000).toFixed(0)}µs`
-          : `${row.duration_ms.toFixed(1)}ms`}
-      </span>
-      <span
-        className="mono"
-        style={{
-          color: "var(--ink-ghost)",
-          fontVariantNumeric: "tabular-nums",
-          textAlign: "right",
-        }}
-      >
-        {formatRelative(row.start_ms)}
-      </span>
+      {message}
     </div>
   );
 }

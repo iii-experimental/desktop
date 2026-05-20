@@ -6,9 +6,17 @@ export interface StreamState {
   messages: Message[];
   pending: Message | null;
   active: boolean;
+  turnState: Record<string, unknown> | null;
+  pausedForApproval: boolean;
 }
 
-const INITIAL: StreamState = { messages: [], pending: null, active: false };
+const INITIAL: StreamState = {
+  messages: [],
+  pending: null,
+  active: false,
+  turnState: null,
+  pausedForApproval: false,
+};
 
 interface AgentEvent {
   type: string;
@@ -102,6 +110,7 @@ function reduce(state: StreamState, action: Action): StreamState {
       };
 
     case "message_start":
+    case "message_update":
     case "message_end": {
       if (!isAssistant(ev.message)) return state;
       const m = ev.message;
@@ -143,6 +152,29 @@ function reduce(state: StreamState, action: Action): StreamState {
       };
     }
 
+    case "function_execution_update": {
+      const id = String(ev.function_call_id ?? "");
+      const pending = state.pending;
+      if (!pending) return state;
+      const existing = (pending.function_calls ?? []).find((c) => c.id === id);
+      if (!existing) return state;
+      const updated: FunctionCall = {
+        ...existing,
+        status: "running",
+        result: (ev as { partial_result?: unknown }).partial_result,
+      };
+      return {
+        ...state,
+        pending: {
+          ...pending,
+          function_calls: (pending.function_calls ?? []).map((c) =>
+            c.id === id ? updated : c,
+          ),
+          parts: upsertCallPart(pending.parts ?? [], updated),
+        },
+      };
+    }
+
     case "function_execution_end": {
       const id = String(ev.function_call_id ?? "");
       const pending = state.pending;
@@ -171,12 +203,35 @@ function reduce(state: StreamState, action: Action): StreamState {
       };
     }
 
-    case "agent_end": {
-      if (!state.pending) return { ...state, active: false };
+    case "turn_state_changed": {
+      const next =
+        (ev as { new_value?: Record<string, unknown> }).new_value ?? null;
+      const paused =
+        next !== null &&
+        (next.kind === "awaiting_approval" ||
+          next.kind === "paused" ||
+          next.awaiting_approval === true ||
+          next.paused === true);
       return {
+        ...state,
+        turnState: next,
+        pausedForApproval: Boolean(paused),
+      };
+    }
+
+    case "agent_end": {
+      if (!state.pending)
+        return {
+          ...state,
+          active: false,
+          pausedForApproval: false,
+        };
+      return {
+        ...state,
         messages: [...state.messages, state.pending],
         pending: null,
         active: false,
+        pausedForApproval: false,
       };
     }
 

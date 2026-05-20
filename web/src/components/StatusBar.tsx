@@ -5,7 +5,7 @@ interface Props {
   ctxPercent?: number;
   ctxUsed?: number;
   ctxMax?: number;
-  status?: "ready" | "busy" | "error";
+  status?: "ready" | "busy" | "error" | "paused";
 }
 
 function formatTokens(n: number): string {
@@ -21,7 +21,13 @@ export function StatusBar({
   status = "ready",
 }: Props) {
   const dotCls =
-    status === "ready" ? "ok" : status === "busy" ? "warn" : "err";
+    status === "ready"
+      ? "ok"
+      : status === "busy"
+        ? "warn"
+        : status === "paused"
+          ? "warn"
+          : "err";
   return (
     <div
       style={{

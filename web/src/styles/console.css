@@ -321,3 +321,52 @@ a:hover {
   color: var(--accent);
   flex-shrink: 0;
 }
+
+/* waterfall tokens — used by traces components */
+.waterfall-track {
+  background: var(--rule-2);
+}
+
+.waterfall-bar {
+  background: var(--ink);
+}
+
+.waterfall-bar.error {
+  background: var(--alert);
+}
+
+.waterfall-bar.warn {
+  background: var(--warn);
+}
+
+.waterfall-bar.unset {
+  background: var(--ink-ghost);
+}
+
+@keyframes trace-flash {
+  0% {
+    background: color-mix(in oklab, var(--accent) 28%, var(--bg));
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.trace-flash {
+  animation: trace-flash 1200ms ease-out;
+}
+
+.resize-handle {
+  position: relative;
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  border-left: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: var(--accent);
+}
