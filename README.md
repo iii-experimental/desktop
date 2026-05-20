@@ -4,6 +4,8 @@ Native desktop shell for the iii engine. Tauri 2 in Rust, React renderer on
 `iii-browser-sdk`, traces and chat on top of the canonical iii harness
 graph from [`iii-hq/workers`](https://github.com/iii-hq/workers).
 
+![iii-desktop — chat dock + traces 3-column view](./docs/screenshots/desktop-traces.png)
+
 The renderer never speaks REST. Every action is `iii.trigger(...)` over
 the engine WebSocket against `harness::*`, `engine::traces::*`,
 `directory::*`, `run::*`, `models::*`, `router::*`, `approval::resolve`,
