@@ -136,7 +136,8 @@ export default function App() {
   }, []);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, _mode: import("./components/Composer").ComposerMode = "agent") => {
+      void _mode;
       if (text.startsWith("/")) {
         if (text === "/clear") {
           setUserMessages([]);
@@ -272,6 +273,20 @@ export default function App() {
     [models, newSession],
   );
 
+  const ctxUsed = useMemo(() => {
+    return allMessages.reduce((acc, m) => {
+      const u = m.usage;
+      if (!u) return acc;
+      return acc + (u.input ?? 0) + (u.output ?? 0);
+    }, 0);
+  }, [allMessages]);
+  const ctxMax = 200_000;
+  const ctxPercent = Math.min(100, Math.round((ctxUsed / ctxMax) * 100));
+
+  const modelPicker = (
+    <ModelPicker options={models} value={model} onChange={setModel} />
+  );
+
   const chatProps = {
     messages: allMessages,
     stream,
@@ -280,6 +295,11 @@ export default function App() {
     onStop: stop,
     approvals,
     onApproval: respondApproval,
+    model,
+    modelPicker,
+    ctxPercent,
+    ctxUsed,
+    ctxMax,
   };
 
   const dockEligible = tab !== "chat";
@@ -314,34 +334,12 @@ export default function App() {
             gap: 14,
           }}
         >
-          <Wordmark />
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: "0.18em",
-              color: "var(--ink-faint)",
-            }}
-          >
-            {tab}
-          </span>
+          <Wordmark sub={tab.toUpperCase()} />
           <ConnectionPill state={connection} />
         </div>
         <div
           style={{ display: "flex", gap: 10, alignItems: "center" }}
         >
-          <span
-            style={{
-              WebkitAppRegion: "no-drag",
-            } as React.CSSProperties}
-          >
-            <ModelPicker
-              options={models}
-              value={model}
-              onChange={setModel}
-            />
-          </span>
           {dockEligible && (
             <span style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
               <button

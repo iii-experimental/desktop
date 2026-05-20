@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { ApprovalRow } from "./ApprovalRow";
-import { Composer } from "./Composer";
+import { Composer, type ComposerMode } from "./Composer";
+import { StatusBar } from "./StatusBar";
 import { Transcript } from "./Transcript";
+import type { ModelOption } from "./ModelPicker";
 import type { FunctionCall, Message } from "../lib/types";
 import type { StreamState } from "../lib/useAgentStream";
 
@@ -9,12 +11,16 @@ interface Props {
   messages: Message[];
   stream: StreamState;
   turnActive: boolean;
-  onSend: (text: string) => void | Promise<void>;
+  onSend: (text: string, mode: ComposerMode) => void | Promise<void>;
   onStop: () => void;
   approvals: FunctionCall[];
   onApproval: (id: string, decision: "approve" | "reject") => void;
   density?: "route" | "dock";
-  header?: ReactNode;
+  model: ModelOption;
+  modelPicker?: ReactNode;
+  ctxPercent?: number;
+  ctxUsed?: number;
+  ctxMax?: number;
 }
 
 export function ChatPanel({
@@ -25,8 +31,11 @@ export function ChatPanel({
   onStop,
   approvals,
   onApproval,
-  density = "route",
-  header,
+  model,
+  modelPicker,
+  ctxPercent,
+  ctxUsed,
+  ctxMax,
 }: Props) {
   return (
     <section
@@ -37,30 +46,19 @@ export function ChatPanel({
         overflow: "hidden",
       }}
     >
-      {header ? (
-        <div
-          style={{
-            padding: density === "dock" ? "6px 12px" : "8px 24px",
-            borderBottom: "1px solid var(--rule)",
-            background: "var(--panel)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            textTransform: "uppercase",
-            letterSpacing: "0.18em",
-            color: "var(--ink-faint)",
-          }}
-        >
-          {header}
-        </div>
-      ) : (
-        <span />
-      )}
+      <StatusBar
+        model={model}
+        ctxPercent={ctxPercent}
+        ctxUsed={ctxUsed}
+        ctxMax={ctxMax}
+        status={turnActive ? "busy" : "ready"}
+      />
       <div style={{ overflowY: "auto" }}>
         <Transcript
           messages={messages}
           pending={stream.pending}
           thinking={turnActive}
-          onSuggest={onSend}
+          onSuggest={(text) => onSend(text, "agent")}
         />
         {approvals.length > 0 && (
           <div
@@ -86,6 +84,7 @@ export function ChatPanel({
         onStop={onStop}
         busy={turnActive}
         disabled={turnActive}
+        modelPicker={modelPicker}
       />
     </section>
   );

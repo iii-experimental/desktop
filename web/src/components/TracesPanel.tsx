@@ -141,9 +141,9 @@ export function TracesPanel() {
       <header
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           justifyContent: "space-between",
-          marginBottom: 18,
+          marginBottom: 14,
         }}
       >
         <div>
@@ -161,33 +161,109 @@ export function TracesPanel() {
           <h2
             style={{
               margin: 0,
-              fontSize: 18,
+              fontSize: 28,
               fontWeight: 500,
               textTransform: "lowercase",
-              letterSpacing: "-0.01em",
+              letterSpacing: "-0.02em",
             }}
           >
-            otel waterfall
+            traces{" "}
+            {paused && (
+              <span
+                style={{
+                  fontSize: 11,
+                  letterSpacing: "0.18em",
+                  color: "var(--ink-faint)",
+                  textTransform: "uppercase",
+                  marginLeft: 8,
+                  verticalAlign: "middle",
+                  border: "1px solid var(--rule)",
+                  padding: "1px 6px",
+                }}
+              >
+                paused
+              </span>
+            )}
           </h2>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span className="mono" style={{ fontSize: 11, color: "var(--ink-faint)" }}>
-            {totals.count} traces · {totals.errors} errors
-          </span>
           <button
             onClick={() => setPaused((v) => !v)}
-            style={{ padding: "3px 12px", fontSize: 12 }}
+            style={{ padding: "4px 12px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}
           >
+            <span aria-hidden>{paused ? "▷" : "⏸"}</span>
             {paused ? "resume" : "pause"}
           </button>
-          <button onClick={() => void refresh()} disabled={loading} style={{ padding: "3px 12px", fontSize: 12 }}>
-            {loading ? "…" : "refresh"}
+          <button onClick={() => void refresh()} disabled={loading} style={{ padding: "4px 12px", fontSize: 12 }}>
+            ↻ refresh
           </button>
-          <button onClick={() => void clear()} style={{ padding: "3px 12px", fontSize: 12 }}>
+          <button onClick={() => void clear()} style={{ padding: "4px 12px", fontSize: 12 }}>
             clear
           </button>
         </div>
       </header>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 14,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <div
+          className="cmd-box"
+          style={{ flex: 1, minWidth: 240, fontSize: 12 }}
+        >
+          <input
+            type="search"
+            placeholder="search traces…"
+            style={{
+              flex: 1,
+              border: 0,
+              background: "transparent",
+              outline: "none",
+              padding: 0,
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+              color: "var(--ink)",
+            }}
+          />
+        </div>
+        {(["no grouping", "message", "session", "function"] as const).map((g) => (
+          <span
+            key={g}
+            className="pill mono"
+            style={{
+              padding: "3px 10px",
+              fontSize: 11,
+              color: g === "no grouping" ? "var(--ink)" : "var(--ink-faint)",
+              borderColor: g === "no grouping" ? "var(--ink)" : "var(--rule)",
+            }}
+          >
+            {g}
+          </span>
+        ))}
+        <span style={{ width: 1, height: 18, background: "var(--rule)" }} />
+        {(["all", "ok", "error", "unset"] as const).map((s) => (
+          <span
+            key={s}
+            className={`pill mono ${s === "all" ? "info" : s === "error" ? "err" : s === "ok" ? "ok" : "neutral"}`}
+            style={{ padding: "3px 10px", fontSize: 11 }}
+          >
+            {s}
+          </span>
+        ))}
+        <span style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
+          <span className="pill mono info" style={{ fontSize: 11 }}>
+            # {totals.count} traces
+          </span>
+          <span className="pill mono err" style={{ fontSize: 11 }}>
+            ● {totals.errors} errors
+          </span>
+        </span>
+      </div>
 
       {otelMissing && (
         <div
