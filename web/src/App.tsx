@@ -1,21 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApprovalRow } from "./components/ApprovalRow";
-import { CommandPalette } from "./components/CommandPalette";
-import { Composer } from "./components/Composer";
 import { ActivityPanel } from "./components/ActivityPanel";
+import { ChatDock } from "./components/ChatDock";
+import { ChatPanel } from "./components/ChatPanel";
+import { CommandPalette } from "./components/CommandPalette";
 import { CostPanel } from "./components/CostPanel";
 import { DirectoryPanel } from "./components/DirectoryPanel";
 import { FilesystemPanel } from "./components/FilesystemPanel";
-import { TracesPanel } from "./components/TracesPanel";
-import { ThemeToggle } from "./components/ThemeToggle";
-import { useTheme } from "./lib/theme";
 import { ModelPicker, type ModelOption } from "./components/ModelPicker";
-import { SessionList, type Session } from "./components/SessionList";
 import { StatusPanel } from "./components/StatusPanel";
-import { Titlebar } from "./components/Titlebar";
-import { Transcript } from "./components/Transcript";
+import { ThemeToggle } from "./components/ThemeToggle";
+import { TracesPanel } from "./components/TracesPanel";
+import { ViewTabs } from "./components/ViewTabs";
+import { Wordmark } from "./components/Wordmark";
+import { useChatDock } from "./lib/chat-dock";
 import { getIiiClient, type ConnectionState } from "./lib/iii-client";
 import { onMenuAction } from "./lib/tauri";
+import { useTheme } from "./lib/theme";
 import type { FunctionCall, Message, Tab } from "./lib/types";
 import { useAgentStream } from "./lib/useAgentStream";
 
@@ -45,28 +45,25 @@ function makeSessionId(): string {
 }
 
 const DEFAULT_MODELS: ModelOption[] = [
-  {
-    provider: "anthropic",
-    model: "claude-opus-4-7",
-    label: "Claude Opus 4.7",
-  },
-  {
-    provider: "anthropic",
-    model: "claude-sonnet-4-6",
-    label: "Claude Sonnet 4.6",
-  },
-  {
-    provider: "anthropic",
-    model: "claude-haiku-4-5",
-    label: "Claude Haiku 4.5",
-  },
+  { provider: "anthropic", model: "claude-opus-4-7", label: "Claude Opus 4.7" },
+  { provider: "anthropic", model: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+  { provider: "anthropic", model: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
   { provider: "openai", model: "gpt-5", label: "GPT-5" },
+];
+
+const VIEW_OPTIONS: { value: Tab; label: string }[] = [
+  { value: "chat", label: "chat" },
+  { value: "traces", label: "traces" },
+  { value: "directory", label: "directory" },
+  { value: "activity", label: "activity" },
+  { value: "files", label: "files" },
+  { value: "cost", label: "cost" },
+  { value: "status", label: "status" },
 ];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("chat");
   const [sessionId, setSessionId] = useState<string>(() => makeSessionId());
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [userMessages, setUserMessages] = useState<Message[]>([]);
   const [model, setModel] = useState<ModelOption>(DEFAULT_MODELS[0]);
@@ -74,6 +71,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [approvals, setApprovals] = useState<FunctionCall[]>([]);
   const [theme, setTheme] = useTheme();
+  const dock = useChatDock();
 
   useEffect(() => {
     let off: (() => void) | undefined;
@@ -98,7 +96,7 @@ export default function App() {
           setModel(opts[0]);
         }
       } catch {
-        // models worker may not be running; keep defaults
+        // keep defaults
       }
     })();
     return () => off?.();
@@ -130,24 +128,6 @@ export default function App() {
 
   const turnActive = stream.active || busy;
 
-  useEffect(() => {
-    setSessions((prev) => {
-      const next = [...prev];
-      const idx = next.findIndex((s) => s.id === sessionId);
-      const last = allMessages[allMessages.length - 1];
-      const preview = last?.content?.slice(0, 80) ?? "";
-      const row: Session = {
-        id: sessionId,
-        title: sessionId,
-        updated_at: last?.timestamp ?? Date.now(),
-        preview,
-      };
-      if (idx >= 0) next[idx] = row;
-      else next.unshift(row);
-      return next.sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0));
-    });
-  }, [sessionId, allMessages]);
-
   const newSession = useCallback(() => {
     setSessionId(makeSessionId());
     setUserMessages([]);
@@ -178,8 +158,6 @@ export default function App() {
 
       try {
         const client = await getIiiClient();
-        // Race-safe: subscribe right before fire so the pump has the entry
-        // before turn-orchestrator publishes its first event.
         await client.call("ui::subscribe", {
           browser_id: client.browserId,
           session_id: sessionId,
@@ -222,7 +200,7 @@ export default function App() {
         const errorMsg: Message = {
           id: `e-${Date.now()}`,
           role: "system",
-          content: `**Error**: ${formatError(err)}`,
+          content: `**error**: ${formatError(err)}`,
           timestamp: Date.now(),
         };
         setUserMessages((m) => [...m, errorMsg]);
@@ -264,28 +242,28 @@ export default function App() {
     () => [
       {
         id: "new",
-        label: "New session",
+        label: "new session",
         hint: "⌘N",
         group: "session" as const,
         run: newSession,
       },
       {
         id: "clear",
-        label: "Clear transcript",
+        label: "clear transcript",
         hint: "",
         group: "session" as const,
         run: () => setUserMessages([]),
       },
-      ...(["chat", "traces", "directory", "activity", "files", "cost", "status"] as const).map((t, i) => ({
-        id: `view-${t}`,
-        label: `View ${t}`,
+      ...VIEW_OPTIONS.map((v, i) => ({
+        id: `view-${v.value}`,
+        label: `view ${v.label}`,
         hint: `⌘${i + 1}`,
         group: "view" as const,
-        run: () => setTab(t),
+        run: () => setTab(v.value),
       })),
       ...models.map((m) => ({
         id: `m-${m.provider}-${m.model}`,
-        label: `Use ${m.label ?? m.model}`,
+        label: `use ${m.label ?? m.model}`,
         hint: m.provider,
         group: "model" as const,
         run: () => setModel(m),
@@ -294,126 +272,139 @@ export default function App() {
     [models, newSession],
   );
 
+  const chatProps = {
+    messages: allMessages,
+    stream,
+    turnActive,
+    onSend: send,
+    onStop: stop,
+    approvals,
+    onApproval: respondApproval,
+  };
+
+  const dockEligible = tab !== "chat";
+  const dockVisible = dockEligible && dock.open;
+
   return (
-    <div className="shell">
-      <Sidebar
-        tab={tab}
-        setTab={setTab}
-        sessions={sessions}
-        activeSession={sessionId}
-        onPickSession={setSessionId}
-        onNewSession={newSession}
-      />
-      <main className="main">
-        <Titlebar connection={connection} sessionTitle={sessionId}>
-          <ModelPicker options={models} value={model} onChange={setModel} />
-          <ThemeToggle theme={theme} onChange={setTheme} />
-        </Titlebar>
-        <div className="workspace">
-          {tab === "chat" && (
-            <>
-              <div style={{ overflowY: "auto" }}>
-                <Transcript
-                  messages={allMessages}
-                  pending={stream.pending}
-                  thinking={turnActive}
-                  onSuggest={send}
-                />
-                {approvals.length > 0 && (
-                  <div
-                    style={{
-                      maxWidth: 920,
-                      margin: "0 auto",
-                      padding: "0 28px 16px",
-                    }}
-                  >
-                    {approvals.map((a) => (
-                      <ApprovalRow
-                        key={a.id}
-                        request={a}
-                        onApprove={() => respondApproval(a.id, "approve")}
-                        onReject={() => respondApproval(a.id, "reject")}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-              <Composer
-                onSend={send}
-                onStop={stop}
-                busy={turnActive}
-                disabled={turnActive}
-              />
-            </>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        background: "var(--bg)",
+      }}
+    >
+      <header
+        style={{
+          height: 44,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 16px 0 90px",
+          borderBottom: "1px solid var(--rule)",
+          background: "var(--bg)",
+          WebkitAppRegion: "drag",
+          userSelect: "none",
+        } as React.CSSProperties}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          <Wordmark />
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.18em",
+              color: "var(--ink-faint)",
+            }}
+          >
+            {tab}
+          </span>
+          <ConnectionPill state={connection} />
+        </div>
+        <div
+          style={{ display: "flex", gap: 10, alignItems: "center" }}
+        >
+          <span
+            style={{
+              WebkitAppRegion: "no-drag",
+            } as React.CSSProperties}
+          >
+            <ModelPicker
+              options={models}
+              value={model}
+              onChange={setModel}
+            />
+          </span>
+          {dockEligible && (
+            <span style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+              <button
+                type="button"
+                onClick={dock.toggle}
+                aria-pressed={dock.open}
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12,
+                  padding: "3px 12px",
+                  background: dock.open ? "var(--ink)" : "var(--bg)",
+                  color: dock.open ? "var(--bg)" : "var(--ink-faint)",
+                  border: `1px solid ${dock.open ? "var(--ink)" : "var(--rule)"}`,
+                  textTransform: "lowercase",
+                }}
+              >
+                {dock.open ? "× chat" : "+ chat"}
+              </button>
+            </span>
           )}
+          <span style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <ViewTabs value={tab} onChange={setTab} options={VIEW_OPTIONS} />
+          </span>
+          <span style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <ThemeToggle theme={theme} onChange={setTheme} />
+          </span>
+        </div>
+      </header>
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        {dockVisible && (
+          <ChatDock
+            width={dock.width}
+            onWidthChange={dock.setWidth}
+            onClose={() => dock.setOpen(false)}
+          >
+            <ChatPanel {...chatProps} density="dock" />
+          </ChatDock>
+        )}
+        <main
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            background: "var(--bg)",
+          }}
+        >
+          {tab === "chat" && <ChatPanel {...chatProps} density="route" />}
           {tab === "traces" && <TracesPanel />}
           {tab === "directory" && <DirectoryPanel />}
           {tab === "activity" && <ActivityPanel />}
           {tab === "files" && <FilesystemPanel />}
           {tab === "cost" && <CostPanel messages={allMessages} />}
           {tab === "status" && <StatusPanel />}
-        </div>
-      </main>
+        </main>
+      </div>
       <CommandPalette items={paletteItems} />
     </div>
   );
 }
 
-interface SidebarProps {
-  tab: Tab;
-  setTab: (tab: Tab) => void;
-  sessions: Session[];
-  activeSession: string | null;
-  onPickSession: (id: string) => void;
-  onNewSession: () => void;
-}
-
-const TABS: { id: Tab; label: string; hint: string }[] = [
-  { id: "chat", label: "chat", hint: "⌘1" },
-  { id: "traces", label: "traces", hint: "⌘2" },
-  { id: "directory", label: "directory", hint: "⌘3" },
-  { id: "activity", label: "activity", hint: "⌘4" },
-  { id: "files", label: "files", hint: "⌘5" },
-  { id: "cost", label: "cost", hint: "⌘6" },
-  { id: "status", label: "status", hint: "⌘7" },
-];
-
-function Sidebar({
-  tab,
-  setTab,
-  sessions,
-  activeSession,
-  onPickSession,
-  onNewSession,
-}: SidebarProps) {
-  return (
-    <aside className="sidebar">
-      <div className="logo">
-        <span className="mark">iii</span>
-        <span className="sep">/</span>
-        <span className="sub">desktop</span>
-      </div>
-      <nav aria-label="primary">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            data-active={tab === t.id}
-            onClick={() => setTab(t.id)}
-          >
-            <span>{t.label.toLowerCase()}</span>
-            <span style={{ color: "var(--muted)", fontSize: 10 }}>
-              {t.hint}
-            </span>
-          </button>
-        ))}
-      </nav>
-      <SessionList
-        sessions={sessions}
-        active={activeSession}
-        onPick={onPickSession}
-        onNew={onNewSession}
-      />
-      <div className="uppercase-label">v0.1.0</div>
-    </aside>
-  );
+function ConnectionPill({ state }: { state: ConnectionState }) {
+  const cls =
+    state === "open" ? "ok" : state === "connecting" ? "warn" : state === "error" ? "err" : "idle";
+  return <span className={`pill mono ${cls}`}>{state}</span>;
 }
