@@ -16,7 +16,12 @@ yarn.lock
 config.yaml
 iii.lock
 data/
-skills/
+
+# Engine runtime drops fetched skill bundles under skills/; our own
+# desktop skill bundle stays committed.
+skills/*
+!skills/iii-desktop/
+!skills/iii-desktop/**
 
 # TypeScript build cache
 *.tsbuildinfo
