@@ -1,43 +1,92 @@
-/*
- * iii-browser-sdk wrapper. Mirrors the bootstrap pattern from
- * workers/harness/web (single WS connection, per-browser handler ids).
- *
- * Tauri tweak: if the bundled harness HTTP isn't reachable (cold start,
- * desktop launched before `iii start`), fall back to the env-provided
- * engine URL and skip the `harness::info` round-trip.
+/**
+ * Lazy-initialized singleton iii-browser-sdk client. Ported from console/web
+ * and extended for the Tauri desktop:
+ *   - the WS URL points straight at the engine (no `/ws` reverse proxy);
+ *     override with `VITE_III_BROWSER_URL`, else `ws://127.0.0.1:49134`.
+ *   - in addition to the console surface (`trigger`/`on`/`registerTrigger`),
+ *     it keeps `call`/`fire`/`subscribeState` so the desktop's traces,
+ *     activity, and status views keep working unchanged.
  */
 
 import {
-  registerWorker,
-  TriggerAction,
+  type IIIConnectionState,
   type ISdk,
+  type RegisterTriggerInput,
   type RemoteFunctionHandler,
+  registerWorker,
 } from "iii-browser-sdk";
 
+export type { IIIConnectionState, RegisterTriggerInput };
+
+/** Desktop-facing connection state used by the header ConnectionPill. */
 export type ConnectionState = "idle" | "connecting" | "open" | "error";
+
+function toConnectionState(s: IIIConnectionState): ConnectionState {
+  switch (s) {
+    case "connected":
+      return "open";
+    case "connecting":
+    case "reconnecting":
+      return "connecting";
+    case "failed":
+      return "error";
+    default:
+      return "idle";
+  }
+}
 
 export interface IiiClient {
   browserId: string;
-  state: ConnectionState;
+  /**
+   * Invoke an iii bus function and await its result. In the iii ecosystem
+   * every bus invocation is a *trigger*. Thin wrapper over the SDK's
+   * `trigger({ function_id, payload })`.
+   */
+  trigger<T = unknown>(
+    functionId: string,
+    payload?: Record<string, unknown>,
+  ): Promise<T>;
+  /** Desktop alias of {@link trigger} retained for traces/activity/status. */
   call<T = unknown>(
     functionId: string,
     payload?: Record<string, unknown>,
     opts?: { timeoutMs?: number },
   ): Promise<T>;
+  /** Fire-and-forget trigger. */
   fire(functionId: string, payload?: Record<string, unknown>): Promise<void>;
   on<P = unknown>(
     functionId: string,
     handler: (payload: P) => void | Promise<void>,
   ): () => void;
+  registerTrigger(input: RegisterTriggerInput): () => void;
+  addConnectionStateListener(
+    handler: (state: IIIConnectionState) => void,
+  ): () => void;
+  /** Desktop adapter: connection state mapped to {@link ConnectionState}. */
   subscribeState(listener: (state: ConnectionState) => void): () => void;
   dispose(): Promise<void>;
 }
 
+interface Deps {
+  resolveWsUrl: () => string;
+  makeBrowserId: () => string;
+  registerWorker: (url: string) => ISdk;
+}
+
 let _clientPromise: Promise<IiiClient> | null = null;
+let _deps: Deps = defaultDeps();
+
+function defaultDeps(): Deps {
+  return {
+    resolveWsUrl,
+    makeBrowserId,
+    registerWorker: (url) => registerWorker(url),
+  };
+}
 
 export function getIiiClient(): Promise<IiiClient> {
   if (!_clientPromise) {
-    _clientPromise = bootstrap();
+    _clientPromise = bootstrap(_deps);
   }
   return _clientPromise;
 }
@@ -49,115 +98,127 @@ export async function disposeIiiClient(): Promise<void> {
   if (client) await client.dispose();
 }
 
-async function bootstrap(): Promise<IiiClient> {
-  const wsUrl = await resolveWsUrl();
-  const browserId = makeBrowserId();
-  const sdk = registerWorker(wsUrl);
-  return wrap(sdk, browserId);
+export function __setIiiClientDepsForTests(overrides: Partial<Deps>): void {
+  _deps = { ..._deps, ...overrides };
+  _clientPromise = null;
 }
 
-async function resolveWsUrl(): Promise<string> {
-  const envUrl = (import.meta.env.VITE_III_BROWSER_URL as string | undefined)
-    ?.trim();
-  if (envUrl) return envUrl;
-
-  // Default to the backend port. Newer harness exposes the same WS endpoint
-  // for both backend and browser workers; the engine RBAC layer scopes
-  // capabilities by registered function prefix.
-  return "ws://127.0.0.1:49134";
+export function __resetIiiClientForTests(): void {
+  _deps = defaultDeps();
+  _clientPromise = null;
 }
 
-function wrap(sdk: ISdk, browserId: string): IiiClient {
-  const unregisters = new Set<() => void>();
-  const stateListeners = new Set<(s: ConnectionState) => void>();
-  let state: ConnectionState = "connecting";
+async function bootstrap(deps: Deps): Promise<IiiClient> {
+  const wsUrl = deps.resolveWsUrl();
+  const browserId = deps.makeBrowserId();
+  const sdk = deps.registerWorker(wsUrl);
+  return wrapSdk(sdk, browserId);
+}
 
-  function setState(next: ConnectionState) {
-    if (next === state) return;
-    state = next;
-    for (const l of stateListeners) l(state);
-  }
+function wrapSdk(sdk: ISdk, browserId: string): IiiClient {
+  const handlerUnregisters = new Set<() => void>();
+  const triggerUnregisters = new Set<() => void>();
 
-  async function call<T>(
+  function trigger<T>(
     functionId: string,
     payload: Record<string, unknown> = {},
-    opts: { timeoutMs?: number } = {},
   ): Promise<T> {
-    try {
-      const result = await sdk.trigger<unknown, T>({
-        function_id: functionId,
-        payload,
-        ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
-      });
-      setState("open");
-      return result;
-    } catch (err) {
-      setState("error");
-      throw err;
-    }
+    return sdk.trigger<unknown, T>({
+      function_id: functionId,
+      payload,
+    });
   }
 
-  async function fire(
+  function on<P>(
     functionId: string,
-    payload: Record<string, unknown> = {},
-  ): Promise<void> {
-    try {
-      await sdk.trigger({
-        function_id: functionId,
-        payload,
-        action: TriggerAction.Void(),
-      });
-      setState("open");
-    } catch (err) {
-      setState("error");
-      throw err;
-    }
+    handler: (payload: P) => void | Promise<void>,
+  ): () => void {
+    const id = `${functionId}::${browserId}`;
+    const wrapped: RemoteFunctionHandler = async (data: unknown) => {
+      await handler(data as P);
+      return null;
+    };
+    const ref = sdk.registerFunction(id, wrapped);
+    let active = true;
+    const unregister = () => {
+      if (!active) return;
+      active = false;
+      handlerUnregisters.delete(unregister);
+      try {
+        ref.unregister();
+      } catch {
+        // SDK already disposed; nothing to do.
+      }
+    };
+    handlerUnregisters.add(unregister);
+    return unregister;
+  }
+
+  function registerTrigger(input: RegisterTriggerInput): () => void {
+    const t = sdk.registerTrigger(input);
+    let active = true;
+    const unregister = () => {
+      if (!active) return;
+      active = false;
+      triggerUnregisters.delete(unregister);
+      try {
+        t.unregister();
+      } catch {
+        // SDK already disposed; nothing to do.
+      }
+    };
+    triggerUnregisters.add(unregister);
+    return unregister;
+  }
+
+  function addConnectionStateListener(
+    handler: (state: IIIConnectionState) => void,
+  ): () => void {
+    return sdk.addConnectionStateListener(handler);
+  }
+
+  function subscribeState(
+    listener: (state: ConnectionState) => void,
+  ): () => void {
+    return sdk.addConnectionStateListener((s) =>
+      listener(toConnectionState(s)),
+    );
+  }
+
+  async function dispose(): Promise<void> {
+    for (const unregister of [...handlerUnregisters]) unregister();
+    for (const unregister of [...triggerUnregisters]) unregister();
+    await sdk.shutdown();
   }
 
   return {
     browserId,
-    get state() {
-      return state;
+    trigger,
+    call: trigger,
+    fire: async (functionId, payload) => {
+      await trigger(functionId, payload);
     },
-    call,
-    fire,
-    on(functionId, handler) {
-      const id = `${functionId}::${browserId}`;
-      const wrapped: RemoteFunctionHandler = async (data) => {
-        await handler(data as never);
-        return null;
-      };
-      const ref = sdk.registerFunction(id, wrapped);
-      let active = true;
-      const off = () => {
-        if (!active) return;
-        active = false;
-        unregisters.delete(off);
-        try {
-          ref.unregister();
-        } catch {
-          // already disposed
-        }
-      };
-      unregisters.add(off);
-      return off;
-    },
-    subscribeState(listener) {
-      stateListeners.add(listener);
-      listener(state);
-      return () => stateListeners.delete(listener);
-    },
-    async dispose() {
-      for (const off of [...unregisters]) off();
-      stateListeners.clear();
-      await sdk.shutdown();
-      setState("idle");
-    },
+    on,
+    registerTrigger,
+    addConnectionStateListener,
+    subscribeState,
+    dispose,
   };
 }
 
+function resolveWsUrl(): string {
+  const override = import.meta.env?.VITE_III_BROWSER_URL as string | undefined;
+  if (typeof override === "string" && override.trim().length > 0) {
+    return override.trim();
+  }
+  return "ws://127.0.0.1:49134";
+}
+
 function makeBrowserId(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return `desktop-${crypto.randomUUID()}`;
   }
   const rand = Math.random().toString(36).slice(2, 10);

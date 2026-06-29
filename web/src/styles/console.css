@@ -6,29 +6,27 @@
  * Adopt verbatim.
  */
 
-:root,
-[data-theme="light"] {
-  /* paper / surface ramp (3-step) */
-  --bg: #f2f0ed;
-  --panel: #e9e6e2;
-  --paper-2: #ebe8e3;
+:root {
+  /* Legacy aliases for inline-styled components. Single source of truth is
+     theme.css `@theme` (`--color-*`); these forward to it so the whole app
+     shares the canonical iii Schematic palette and flips with
+     [data-theme="dark"] automatically. */
+  --bg: var(--color-bg);
+  --panel: var(--color-panel);
+  --paper-2: var(--color-paper-2);
 
-  /* ink ramp (3-step) */
-  --ink: #0a0a0a;
-  --ink-faint: #6b6865;
-  --ink-ghost: #a3a09c;
+  --ink: var(--color-ink);
+  --ink-faint: var(--color-ink-faint);
+  --ink-ghost: var(--color-ink-ghost);
 
-  /* structural rules */
-  --rule: #d8d5d0;
-  --rule-2: #e6e3df;
+  --rule: var(--color-rule);
+  --rule-2: var(--color-rule-2);
 
-  /* accent — single hero (hot orange) */
-  --accent: #ff5a1f;
-  --accent-fg: #f2f0ed;
+  --accent: var(--color-accent);
+  --accent-fg: var(--color-accent-fg);
 
-  /* status */
-  --alert: #c43e1c;
-  --warn: #a87a00;
+  --alert: var(--color-alert);
+  --warn: var(--color-warn);
 
   /* legacy aliases used by older components, mapped onto the schematic */
   --background: var(--bg);
@@ -67,36 +65,8 @@
     "Liberation Mono", "Courier New", monospace;
 }
 
-[data-theme="dark"] {
-  --bg: #111110;
-  --panel: #1a1916;
-  --paper-2: #1f1e1c;
-  --ink: #f2f0ed;
-  --ink-faint: #9c9893;
-  --ink-ghost: #5d5a55;
-  --rule: #2a2926;
-  --rule-2: #1f1e1c;
-  --accent: #3ea8ff;
-  --accent-fg: #111110;
-  --alert: #ff7a5c;
-  --warn: #d4a23a;
-
-  --background: var(--bg);
-  --foreground: var(--ink);
-  --sidebar: var(--panel);
-  --elevated: var(--bg);
-  --hover: var(--panel);
-  --border: var(--rule);
-  --border-subtle: var(--rule-2);
-  --muted: var(--ink-ghost);
-  --secondary: var(--ink-faint);
-  --accent-strong: var(--accent);
-  --accent-text: var(--accent-fg);
-  --prompt: var(--accent);
-  --success: var(--accent);
-  --warning: var(--warn);
-  --error: var(--alert);
-}
+/* Dark mode is driven entirely by theme.css `[data-theme="dark"]` flipping
+   the `--color-*` tokens; the legacy aliases above forward to them. */
 
 * {
   box-sizing: border-box;
@@ -253,30 +223,34 @@ body,
   50% { opacity: 0; }
 }
 
-button,
-input,
-textarea,
-select {
-  font-family: var(--font-mono);
-  font-size: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: 0;
-  padding: 6px 12px;
-  outline: none;
-}
+/* Bare-element defaults live in @layer base so ported component-kit widgets
+   (Button, ModeToggle — styled with Tailwind utilities) win the cascade. */
+@layer base {
+  button,
+  input,
+  textarea,
+  select {
+    font-family: var(--font-mono);
+    font-size: inherit;
+    color: inherit;
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    padding: 6px 12px;
+    outline: none;
+  }
 
-button {
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-  text-transform: lowercase;
-}
+  button {
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    text-transform: lowercase;
+  }
 
-button:hover {
-  background: var(--ink);
-  color: var(--bg);
-  border-color: var(--ink);
+  button:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
 }
 
 button:focus-visible,

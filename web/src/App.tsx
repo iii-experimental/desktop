@@ -1,408 +1,325 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityPanel } from "./components/ActivityPanel";
-import { ChatDock } from "./components/ChatDock";
-import { ChatPanel } from "./components/ChatPanel";
-import { CommandPalette } from "./components/CommandPalette";
-import { CostPanel } from "./components/CostPanel";
-import { DirectoryPanel } from "./components/DirectoryPanel";
-import { FilesystemPanel } from "./components/FilesystemPanel";
-import { ModelPicker, type ModelOption } from "./components/ModelPicker";
-import { StatusPanel } from "./components/StatusPanel";
-import { ThemeToggle } from "./components/ThemeToggle";
-import { TracesPanel } from "./components/TracesPanel";
-import { ViewTabs } from "./components/ViewTabs";
-import { Wordmark } from "./components/Wordmark";
-import { useChatDock } from "./lib/chat-dock";
-import { getIiiClient, type ConnectionState } from "./lib/iii-client";
-import { onMenuAction } from "./lib/tauri";
-import { useTheme } from "./lib/theme";
-import type { FunctionCall, Message, Tab } from "./lib/types";
-import { useAgentStream } from "./lib/useAgentStream";
+import { CircleQuestionMark, SettingsIcon } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ChatDock } from '@/components/chat/ChatDock'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/Dialog'
+import { ModeToggle } from '@/components/ui/ModeToggle'
+import { Sheet } from '@/components/ui/Sheet'
+import { Wordmark } from '@/components/ui/Wordmark'
+import { useChatDock } from '@/hooks/use-chat-dock'
+import { useHashRoute, type View } from '@/hooks/use-hash-route'
+import { useTheme } from '@/hooks/use-theme'
+import { type DockSignal, getDockSignal } from '@/lib/chat-activity'
+import {
+  ConversationsProvider,
+  useConversationsCtx,
+} from '@/lib/conversations-context'
+import { cn } from '@/lib/utils'
+import { Configuration } from '@/pages/Configuration'
+import { Traces } from '@/pages/Traces'
+import { Workers } from '@/pages/Workers'
 
-function formatError(err: unknown): string {
-  if (typeof err === "string") return err;
-  if (err instanceof Error) return err.message;
-  if (err && typeof err === "object") {
-    const obj = err as Record<string, unknown>;
-    const code = typeof obj.code === "string" ? obj.code : undefined;
-    const message = typeof obj.message === "string" ? obj.message : undefined;
-    if (code && message) return `${code}: ${message}`;
-    if (message) return message;
-    if (code) return code;
-    try {
-      return JSON.stringify(err);
-    } catch {
-      return String(err);
-    }
-  }
-  return String(err);
-}
+/* The component spec sheet and the streaming-scenario playground now live in
+   Storybook (`pnpm storybook`), not as in-app routes. The header keeps a
+   single `traces` entry alongside the configuration gear. */
+const VIEW_OPTIONS: { value: View; label: string }[] = [
+  { value: 'traces', label: 'traces' },
+  { value: 'workers', label: 'workers' },
+]
 
-function makeSessionId(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `s${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-}
+export function App() {
+  const [theme, setTheme] = useTheme()
+  const [view, setView] = useHashRoute()
+  const dock = useChatDock()
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
-const DEFAULT_MODELS: ModelOption[] = [
-  { provider: "anthropic", model: "claude-opus-4-7", label: "Claude Opus 4.7" },
-  { provider: "anthropic", model: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-  { provider: "anthropic", model: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
-  { provider: "openai", model: "gpt-5", label: "GPT-5" },
-];
-
-const VIEW_OPTIONS: { value: Tab; label: string }[] = [
-  { value: "chat", label: "chat" },
-  { value: "traces", label: "traces" },
-  { value: "directory", label: "directory" },
-  { value: "activity", label: "activity" },
-  { value: "files", label: "files" },
-  { value: "cost", label: "cost" },
-  { value: "status", label: "status" },
-];
-
-export default function App() {
-  const [tab, setTab] = useState<Tab>("chat");
-  const [sessionId, setSessionId] = useState<string>(() => makeSessionId());
-  const [connection, setConnection] = useState<ConnectionState>("idle");
-  const [userMessages, setUserMessages] = useState<Message[]>([]);
-  const [model, setModel] = useState<ModelOption>(DEFAULT_MODELS[0]);
-  const [models, setModels] = useState<ModelOption[]>(DEFAULT_MODELS);
-  const [busy, setBusy] = useState(false);
-  const [approvals, setApprovals] = useState<FunctionCall[]>([]);
-  const [theme, setTheme] = useTheme();
-  const dock = useChatDock();
-
+  /* When the dock transitions from collapsed → expanded, focus the
+     composer so the user can start typing immediately. requestAnimationFrame
+     waits for the mount/paint cycle; if the editor isn't there (no active
+     conversation, etc.) the focus is a no-op. */
+  const wasCollapsedRef = useRef(dock.collapsed)
   useEffect(() => {
-    let off: (() => void) | undefined;
-    void (async () => {
-      const client = await getIiiClient();
-      off = client.subscribeState(setConnection);
-      try {
-        const result = await client.call<{
-          models?: Array<{
-            id: string;
-            display_name?: string;
-            provider: string;
-          }>;
-        }>("models::list", {});
-        const opts: ModelOption[] = (result.models ?? []).map((m) => ({
-          provider: m.provider,
-          model: m.id,
-          label: m.display_name ?? m.id,
-        }));
-        if (opts.length > 0) {
-          setModels(opts);
-          setModel(opts[0]);
-        }
-      } catch {
-        // keep defaults
-      }
-    })();
-    return () => off?.();
-  }, []);
+    const wasCollapsed = wasCollapsedRef.current
+    wasCollapsedRef.current = dock.collapsed
+    if (!wasCollapsed || dock.collapsed) return
+    if (typeof window === 'undefined') return
+    const frame = window.requestAnimationFrame(() => {
+      const editor = document.querySelector<HTMLElement>('.composer-editor')
+      editor?.focus()
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [dock.collapsed])
 
+  /* `?` opens the shortcuts overlay. Ignored when the user is typing into
+     editable elements so we don't fight the composer. */
   useEffect(() => {
-    let off: (() => void) | undefined;
-    void (async () => {
-      off = await onMenuAction((action) => {
-        if (action === "session.new") {
-          newSession();
-        } else if (action.startsWith("view.")) {
-          setTab(action.replace("view.", "") as Tab);
-        }
-      });
-    })();
-    return () => off?.();
-  }, []);
-
-  const stream = useAgentStream(sessionId);
-
-  const allMessages = useMemo<Message[]>(
-    () =>
-      [...userMessages, ...stream.messages].sort(
-        (a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0),
-      ),
-    [userMessages, stream.messages],
-  );
-
-  const turnActive = stream.active || busy;
-
-  const newSession = useCallback(() => {
-    setSessionId(makeSessionId());
-    setUserMessages([]);
-    setApprovals([]);
-    setBusy(false);
-  }, []);
-
-  const send = useCallback(
-    async (text: string, _mode: import("./components/Composer").ComposerMode = "agent") => {
-      void _mode;
-      if (text.startsWith("/")) {
-        if (text === "/clear") {
-          setUserMessages([]);
-          return;
-        }
-        if (text === "/new") {
-          newSession();
-          return;
-        }
-      }
-      const userMsg: Message = {
-        id: `u-${Date.now()}`,
-        role: "user",
-        content: text,
-        timestamp: Date.now(),
-      };
-      setUserMessages((m) => [...m, userMsg]);
-      setBusy(true);
-
-      try {
-        const client = await getIiiClient();
-        await client.call("ui::subscribe", {
-          browser_id: client.browserId,
-          session_id: sessionId,
-        });
-        await client.fire("run::start", {
-          session_id: sessionId,
-          provider: model.provider,
-          model: model.model,
-          messages: [
-            ...allMessages
-              .filter((m) => m.role === "user" || m.role === "assistant")
-              .map((m) => {
-                const base = {
-                  role: m.role,
-                  content: [{ type: "text", text: m.content }],
-                  timestamp: m.timestamp,
-                };
-                if (m.role !== "assistant") return base;
-                return {
-                  ...base,
-                  stop_reason: m.stop_reason ?? "end",
-                  provider: m.provider ?? model.provider,
-                  model: m.model ?? model.model,
-                  usage: m.usage ?? {
-                    input: 0,
-                    output: 0,
-                    cache_read: 0,
-                    cache_write: 0,
-                  },
-                };
-              }),
-            {
-              role: "user",
-              content: [{ type: "text", text }],
-              timestamp: userMsg.timestamp,
-            },
-          ],
-        });
-      } catch (err) {
-        const errorMsg: Message = {
-          id: `e-${Date.now()}`,
-          role: "system",
-          content: `**error**: ${formatError(err)}`,
-          timestamp: Date.now(),
-        };
-        setUserMessages((m) => [...m, errorMsg]);
-      } finally {
-        setBusy(false);
-      }
-    },
-    [allMessages, model, sessionId, newSession],
-  );
-
-  const respondApproval = useCallback(
-    async (id: string, decision: "approve" | "reject") => {
-      try {
-        const client = await getIiiClient();
-        await client.call("approval::resolve", {
-          session_id: sessionId,
-          function_call_id: id,
-          decision: decision === "approve" ? "allow" : "deny",
-        });
-      } catch (err) {
-        console.warn("approval resolve failed", formatError(err));
-      }
-      setApprovals((a) => a.filter((x) => x.id !== id));
-    },
-    [sessionId],
-  );
-
-  const stop = useCallback(async () => {
-    try {
-      const client = await getIiiClient();
-      await client.call("router::abort", { session_id: sessionId });
-    } catch (err) {
-      console.warn("abort failed", formatError(err));
+    if (typeof window === 'undefined') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== '?') return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (target?.isContentEditable) return
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      e.preventDefault()
+      setShortcutsOpen(true)
     }
-    setBusy(false);
-  }, [sessionId]);
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
-  const paletteItems = useMemo(
-    () => [
-      {
-        id: "new",
-        label: "new session",
-        hint: "⌘N",
-        group: "session" as const,
-        run: newSession,
-      },
-      {
-        id: "clear",
-        label: "clear transcript",
-        hint: "",
-        group: "session" as const,
-        run: () => setUserMessages([]),
-      },
-      ...VIEW_OPTIONS.map((v, i) => ({
-        id: `view-${v.value}`,
-        label: `view ${v.label}`,
-        hint: `⌘${i + 1}`,
-        group: "view" as const,
-        run: () => setTab(v.value),
-      })),
-      ...models.map((m) => ({
-        id: `m-${m.provider}-${m.model}`,
-        label: `use ${m.label ?? m.model}`,
-        hint: m.provider,
-        group: "model" as const,
-        run: () => setModel(m),
-      })),
-    ],
-    [models, newSession],
-  );
-
-  const ctxUsed = useMemo(() => {
-    return allMessages.reduce((acc, m) => {
-      const u = m.usage;
-      if (!u) return acc;
-      return acc + (u.input ?? 0) + (u.output ?? 0);
-    }, 0);
-  }, [allMessages]);
-  const ctxMax = 200_000;
-  const ctxPercent = Math.min(100, Math.round((ctxUsed / ctxMax) * 100));
-
-  const modelPicker = (
-    <ModelPicker options={models} value={model} onChange={setModel} />
-  );
-
-  const chatProps = {
-    messages: allMessages,
-    stream,
-    turnActive,
-    onSend: send,
-    onStop: stop,
-    approvals,
-    onApproval: respondApproval,
-    model,
-    modelPicker,
-    ctxPercent,
-    ctxUsed,
-    ctxMax,
-  };
-
-  const dockEligible = tab !== "chat";
-  const dockVisible = dockEligible && dock.open;
+  const collapseDock = useCallback(() => {
+    dock.setCollapsed(true)
+  }, [dock])
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        background: "var(--bg)",
-      }}
-    >
-      <header
-        style={{
-          height: 44,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 16px 0 90px",
-          borderBottom: "1px solid var(--rule)",
-          background: "var(--bg)",
-          WebkitAppRegion: "drag",
-          userSelect: "none",
-        } as React.CSSProperties}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-          }}
-        >
-          <Wordmark sub={tab.toUpperCase()} />
-          <ConnectionPill state={connection} />
-        </div>
-        <div
-          style={{ display: "flex", gap: 10, alignItems: "center" }}
-        >
-          {dockEligible && (
-            <span style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-              <button
-                type="button"
-                onClick={dock.toggle}
-                aria-pressed={dock.open}
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 12,
-                  padding: "3px 12px",
-                  background: dock.open ? "var(--ink)" : "var(--bg)",
-                  color: dock.open ? "var(--bg)" : "var(--ink-faint)",
-                  border: `1px solid ${dock.open ? "var(--ink)" : "var(--rule)"}`,
-                  textTransform: "lowercase",
-                }}
-              >
-                {dock.open ? "× chat" : "+ chat"}
-              </button>
-            </span>
-          )}
-          <span style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-            <ViewTabs value={tab} onChange={setTab} options={VIEW_OPTIONS} />
-          </span>
-          <span style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-            <ThemeToggle theme={theme} onChange={setTheme} />
-          </span>
-        </div>
-      </header>
-      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        {dockVisible && (
+    <ConversationsProvider>
+      <Sheet>
+        <Header
+          view={view}
+          onViewChange={setView}
+          dockCollapsed={dock.collapsed}
+          onToggleDock={dock.toggleCollapsed}
+          onOpenShortcuts={() => setShortcutsOpen(true)}
+        />
+        <div className="flex-1 flex min-h-0">
           <ChatDock
             width={dock.width}
             onWidthChange={dock.setWidth}
-            onClose={() => dock.setOpen(false)}
-          >
-            <ChatPanel {...chatProps} density="dock" />
-          </ChatDock>
-        )}
-        <main
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            background: "var(--bg)",
-          }}
-        >
-          {tab === "chat" && <ChatPanel {...chatProps} density="route" />}
-          {tab === "traces" && <TracesPanel />}
-          {tab === "directory" && <DirectoryPanel />}
-          {tab === "activity" && <ActivityPanel />}
-          {tab === "files" && <FilesystemPanel />}
-          {tab === "cost" && <CostPanel messages={allMessages} />}
-          {tab === "status" && <StatusPanel />}
-        </main>
-      </div>
-      <CommandPalette items={paletteItems} />
-    </div>
-  );
+            collapsed={dock.collapsed}
+            onCollapse={collapseDock}
+          />
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
+            {view === 'configuration' ? (
+              <Configuration theme={theme} onThemeChange={setTheme} />
+            ) : view === 'workers' ? (
+              <Workers />
+            ) : (
+              <Traces />
+            )}
+          </div>
+        </div>
+        <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      </Sheet>
+    </ConversationsProvider>
+  )
 }
 
-function ConnectionPill({ state }: { state: ConnectionState }) {
-  const cls =
-    state === "open" ? "ok" : state === "connecting" ? "warn" : state === "error" ? "err" : "idle";
-  return <span className={`pill mono ${cls}`}>{state}</span>;
+interface HeaderProps {
+  view: View
+  onViewChange: (next: View) => void
+  dockCollapsed: boolean
+  onToggleDock: () => void
+  onOpenShortcuts: () => void
+}
+
+function Header({
+  view,
+  onViewChange,
+  dockCollapsed,
+  onToggleDock,
+  onOpenShortcuts,
+}: HeaderProps) {
+  const onConfiguration = view === 'configuration'
+  return (
+    <header
+      className="flex items-center justify-between pl-[80px] pr-6 h-12 border-b border-rule shrink-0"
+      style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+    >
+      <div
+        className="flex items-center gap-3"
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      >
+        <DockToggle collapsed={dockCollapsed} onToggle={onToggleDock} />
+        <Wordmark />
+        <span className="font-mono text-[11px] mb-[-2px] leading-[14px] uppercase tracking-[0.16em] text-ink-faint font-semibold">
+          {view}
+        </span>
+      </div>
+      <div
+        className="flex items-center gap-3"
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      >
+        <ModeToggle<View>
+          value={view}
+          onChange={onViewChange}
+          options={VIEW_OPTIONS}
+        />
+        <button
+          type="button"
+          onClick={onOpenShortcuts}
+          aria-label="keyboard shortcuts (?)"
+          title="keyboard shortcuts (?)"
+          className="font-mono text-[14px] leading-none w-8 h-8 flex items-center justify-center border bg-transparent text-ink-faint border-rule hover:text-ink hover:border-ink transition-colors focus-visible:border-accent focus-visible:outline-none"
+        >
+          <span aria-hidden>
+            <CircleQuestionMark className="w-4 h-4" />
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onViewChange('configuration')}
+          aria-pressed={onConfiguration}
+          aria-label="configuration"
+          title="configuration"
+          className={cn(
+            'font-mono text-[14px] leading-none w-8 h-8 flex items-center justify-center border transition-colors',
+            onConfiguration
+              ? 'bg-ink text-bg border-ink'
+              : 'bg-transparent text-ink-faint border-rule hover:text-ink hover:border-ink',
+          )}
+        >
+          <SettingsIcon className="w-4 h-4" />
+        </button>
+      </div>
+    </header>
+  )
+}
+
+interface DockToggleProps {
+  collapsed: boolean
+  onToggle: () => void
+}
+
+/**
+ * Global chat-dock toggle, pinned to the leftmost slot of the app header.
+ * One typographic glyph (`>_`), one place: the button state communicates
+ * open/closed via the same pressed-vs-outlined vocabulary the configuration
+ * gear uses on the opposite end of the header. The `?` button between them
+ * documents this binding (and every other) — no inline kbd hint needed.
+ *
+ * The `_` of the `>_` glyph blinks at terminal cadence so the toggle reads
+ * as an AI prompt waiting for input. Suppressed during `active` so the
+ * button never carries two concurrent motion sources (the square accent
+ * ring is the focal motion; a flickering cursor underneath would be noise).
+ *
+ * Collapsed state is dimensional, not binary: `getDockSignal()` resolves
+ * the active conversation into one of four states. `active` (streaming,
+ * pending approval, running tool call) pulses accent so blocking events
+ * don't get buried. `attention` and `error` (system message tones) tint
+ * the border statically — motion is the wrong gesture for "the engine
+ * reported a problem." Clicking the toggle in any signal state expands
+ * the dock, which auto-scrolls to the latest message; the user lands on
+ * the warn / error content without hunting.
+ */
+function DockToggle({ collapsed, onToggle }: DockToggleProps) {
+  const { active } = useConversationsCtx()
+  const signal = getDockSignal(active)
+  const expanded = !collapsed
+  const baseLabel = collapsed ? 'open chat dock' : 'collapse chat dock'
+  const signalPreview = useDockSignalPreview(signal, active)
+  /* When the toggle border carries a warn/error tint, surface the actual
+     system-message text in `title` + `aria-label` so the user can triage
+     without expanding the dock and hunting. Idle/active states get the
+     plain label. */
+  const fullLabel = signalPreview
+    ? `${baseLabel} (⌘\\) — ${signalPreview}`
+    : `${baseLabel} (⌘\\)`
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={fullLabel}
+      aria-expanded={expanded}
+      aria-controls="chat-dock"
+      title={fullLabel}
+      className={cn(
+        'font-mono text-[14px] leading-none w-7 h-7 flex items-center justify-center border transition-colors focus-visible:border-accent focus-visible:outline-none',
+        expanded ? 'bg-ink text-bg border-ink' : dockToggleSignalClass(signal),
+      )}
+    >
+      {/* Single optical mark: `>` plus a `_` cursor pulled snug underneath
+          via negative letter-spacing so the cluster sits in roughly the
+          same visual footprint as `⚙` and `?` next to it in the header. */}
+      <span
+        aria-hidden
+        className="inline-flex items-baseline"
+        style={{ letterSpacing: '-0.18em' }}
+      >
+        {'>'}
+        <span className={signal === 'active' ? undefined : 'blink'}>_</span>
+      </span>
+    </button>
+  )
+}
+
+const PREVIEW_MAX_LENGTH = 80
+
+/**
+ * Returns a truncated preview of the latest warn/error system message in
+ * the active conversation, or `null` when the dock signal doesn't warrant
+ * one. Surfaced through the toggle's `title` and `aria-label` so the user
+ * gets inline triage from the chrome itself.
+ */
+function useDockSignalPreview(
+  signal: DockSignal,
+  active: ReturnType<typeof useConversationsCtx>['active'],
+): string | null {
+  if (signal !== 'error' && signal !== 'attention') return null
+  if (!active) return null
+  for (let i = active.messages.length - 1; i >= 0; i--) {
+    const m = active.messages[i]
+    if (m && m.role === 'system' && (m.tone === 'error' || m.tone === 'warn')) {
+      const flat = m.content.replace(/\s+/g, ' ').trim()
+      return flat.length > PREVIEW_MAX_LENGTH
+        ? `${flat.slice(0, PREVIEW_MAX_LENGTH - 1)}…`
+        : flat
+    }
+  }
+  return null
+}
+
+function dockToggleSignalClass(signal: DockSignal): string {
+  switch (signal) {
+    case 'active':
+      return 'bg-transparent text-accent border-accent pulse-square'
+    case 'attention':
+      return 'bg-transparent text-warn border-warn'
+    case 'error':
+      return 'bg-transparent text-alert border-alert'
+    default:
+      return 'bg-transparent text-ink-faint border-rule hover:text-ink hover:border-ink'
+  }
+}
+
+interface ShortcutsDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+const SHORTCUTS: { combo: string; description: string }[] = [
+  { combo: '⌘\\', description: 'toggle chat dock' },
+  { combo: 'Esc', description: 'collapse chat dock when focused inside' },
+  { combo: '?', description: 'open this shortcut overlay' },
+]
+
+function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogTitle className="text-[11px] uppercase tracking-[0.18em] text-ink-faint">
+          keyboard shortcuts
+        </DialogTitle>
+        <DialogDescription className="mt-1">
+          press <kbd className="font-mono text-ink">?</kbd> any time to reopen
+          this list.
+        </DialogDescription>
+        <ul className="mt-4 divide-y divide-rule-2 border-t border-b border-rule-2">
+          {SHORTCUTS.map(({ combo, description }) => (
+            <li
+              key={combo}
+              className="flex items-center justify-between gap-6 py-2 font-mono text-[12px] text-ink"
+            >
+              <span className="text-ink-faint">{description}</span>
+              <kbd className="text-ink tracking-[0.06em]">{combo}</kbd>
+            </li>
+          ))}
+        </ul>
+      </DialogContent>
+    </Dialog>
+  )
 }
