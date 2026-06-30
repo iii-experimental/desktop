@@ -30,9 +30,9 @@ async fn register_loop(
     engine_url: String,
     shutdown: &mut mpsc::Receiver<()>,
 ) -> anyhow::Result<()> {
-    use iii_sdk::{
-        register_worker, IIIError, InitOptions, RegisterFunctionMessage, WorkerMetadata,
-    };
+    use iii_sdk::errors::Error;
+    use iii_sdk::runtime::WorkerMetadata;
+    use iii_sdk::{register_worker, InitOptions, RegisterFunction};
     use serde_json::{json, Value};
 
     tracing::info!(engine_url, "connecting to iii engine");
@@ -53,23 +53,22 @@ async fn register_loop(
     );
     let iii = Arc::new(iii);
 
-    let _status = iii.register_function((
-        RegisterFunctionMessage::with_id("desktop::status".into())
-            .with_description("Liveness probe for the desktop worker.".into()),
-        |_payload: Value| async move {
-            Ok::<_, IIIError>(json!({
+    let _status = iii.register_function(
+        "desktop::status",
+        RegisterFunction::new_async(|_payload: Value| async move {
+            Ok::<_, Error>(json!({
                 "ok": true,
                 "name": "iii-desktop",
                 "version": env!("CARGO_PKG_VERSION"),
             }))
-        },
-    ));
+        })
+        .description("Liveness probe for the desktop worker."),
+    );
 
     let app_focus = app.clone();
-    let _focus = iii.register_function((
-        RegisterFunctionMessage::with_id("desktop::window::focus".into())
-            .with_description("Bring the desktop window to the front.".into()),
-        move |_payload: Value| {
+    let _focus = iii.register_function(
+        "desktop::window::focus",
+        RegisterFunction::new_async(move |_payload: Value| {
             let app = app_focus.clone();
             async move {
                 use tauri::Manager;
@@ -77,10 +76,11 @@ async fn register_loop(
                     let _ = window.show();
                     let _ = window.set_focus();
                 }
-                Ok::<_, IIIError>(json!({ "ok": true }))
+                Ok::<_, Error>(json!({ "ok": true }))
             }
-        },
-    ));
+        })
+        .description("Bring the desktop window to the front."),
+    );
 
     tracing::info!("desktop worker registered; awaiting shutdown");
     let _ = shutdown.recv().await;
