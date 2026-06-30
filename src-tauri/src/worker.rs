@@ -72,11 +72,14 @@ async fn register_loop(
             let app = app_focus.clone();
             async move {
                 use tauri::Manager;
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-                Ok::<_, Error>(json!({ "ok": true }))
+                let Some(window) = app.get_webview_window("main") else {
+                    return Ok::<_, Error>(
+                        json!({ "ok": false, "reason": "main window not found" }),
+                    );
+                };
+                let shown = window.show().is_ok();
+                let focused = window.set_focus().is_ok();
+                Ok::<_, Error>(json!({ "ok": shown && focused }))
             }
         })
         .description("Bring the desktop window to the front."),

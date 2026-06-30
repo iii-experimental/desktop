@@ -50,9 +50,17 @@
       const msg = document.getElementById("msg");
       let tries = 0;
 
+      // Readiness probe only: is the console worker serving on this loopback
+      // port yet. It hits a console-specific asset rather than `/` so a bare
+      // unrelated server is less likely to satisfy it. This is not a trust
+      // boundary; the target is a fixed loopback port the shell itself brings
+      // up via `iii worker add console`.
       async function ready() {
         try {
-          await fetch(CONSOLE_URL + "/", { mode: "no-cors", cache: "no-store" });
+          await fetch(CONSOLE_URL + "/favicon/favicon.ico", {
+            mode: "no-cors",
+            cache: "no-store",
+          });
           return true;
         } catch {
           return false;

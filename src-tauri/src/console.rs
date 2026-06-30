@@ -28,7 +28,14 @@ pub fn ensure() {
         .arg("console")
         .spawn()
     {
-        Ok(_) => tracing::info!("ensuring iii console worker (worker add console)"),
+        Ok(mut child) => {
+            tracing::info!("ensuring iii console worker (worker add console)");
+            // `iii worker add console` is short-lived; reap it on a detached
+            // thread so it does not linger as a zombie until the app exits.
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+        }
         Err(err) => {
             tracing::warn!(%err, "could not run `iii worker add console`; expecting an external console")
         }
