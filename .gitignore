@@ -6,8 +6,9 @@ build/
 .env.*
 !.env.example
 
-# Lockfiles are never committed in iii-experimental repos
-Cargo.lock
+# JS lockfiles are not committed; Cargo.lock IS committed because this is a
+# binary crate and CI resolves transitive deps without it (e.g. time/cookie
+# version skew breaks the build).
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
@@ -43,3 +44,4 @@ web/.vite/
 CLAUDE.md
 .cursorrules
 .aider*
+.gstack/

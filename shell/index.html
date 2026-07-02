@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>iii</title>
+    <style>
+      :root { color-scheme: light dark; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #f2f0ed;
+        color: #6b6865;
+        font-family: "Chivo Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #111110; color: #a8a49e; }
+      }
+      .center {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        user-select: none;
+      }
+      .mark { display: flex; gap: 6px; }
+      .mark i {
+        width: 10px; height: 28px; background: currentColor; display: block;
+      }
+      .msg { font-size: 12px; letter-spacing: 0.06em; text-transform: lowercase; }
+      .err { color: #c43e1c; }
+    </style>
+  </head>
+  <body>
+    <div class="center">
+      <div class="mark" aria-label="iii"><i></i><i></i><i></i></div>
+      <div class="msg" id="msg">starting iii console&hellip;</div>
+    </div>
+    <script>
+      // The desktop shell is a thin native wrapper. The UI is the iii console
+      // server (started by the Rust shell as a sidecar). Poll until it answers,
+      // then hand the webview over to it. Whatever the installed harness bundle
+      // ships is what renders; nothing is vendored here.
+      const CONSOLE_URL =
+        new URLSearchParams(location.search).get("console") ||
+        "http://127.0.0.1:3113";
+      const msg = document.getElementById("msg");
+      let tries = 0;
+
+      // Readiness probe only: is the console worker serving on this loopback
+      // port yet. It hits a console-specific asset rather than `/` so a bare
+      // unrelated server is less likely to satisfy it. This is not a trust
+      // boundary; the target is a fixed loopback port the shell itself brings
+      // up via `iii worker add console`.
+      async function ready() {
+        try {
+          await fetch(CONSOLE_URL + "/favicon/favicon.ico", {
+            mode: "no-cors",
+            cache: "no-store",
+          });
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      async function poll() {
+        if (await ready()) {
+          location.replace(CONSOLE_URL);
+          return;
+        }
+        tries += 1;
+        if (tries > 5) {
+          msg.textContent = "waiting for iii console " + CONSOLE_URL + "…";
+          msg.classList.add("err");
+        }
+        setTimeout(poll, 600);
+      }
+
+      poll();
+    </script>
+  </body>
+</html>

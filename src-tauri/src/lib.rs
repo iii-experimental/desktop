@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, RunEvent};
 
+mod console;
 mod functions;
 mod menu;
 mod worker;
@@ -42,6 +43,8 @@ pub fn run() {
 
 fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     menu::install(app)?;
+
+    console::ensure();
 
     let handle: AppHandle = app.handle().clone();
     let worker = worker::spawn(handle.clone());
