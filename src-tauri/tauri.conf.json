@@ -33,12 +33,14 @@
     "active": true,
     "targets": "all",
     "category": "DeveloperTool",
-    "shortDescription": "iii chat desktop",
-    "longDescription": "Native desktop shell for the iii chat surface. Talks to the iii engine over WebSocket and renders the iii-browser worker UI.",
+    "shortDescription": "iii console desktop",
+    "longDescription": "Thin native shell for the iii harness console. Ensures the console worker and serves it in a Tauri window.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
       "icons/icon.png"
     ],
     "macOS": {
